@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
 )
 
+from labeling_tool.cursors import CURSORE_DEFAULT, crea_cursore, cursore_valido
 from labeling_tool.model import area_poligono, distanza_px
 
 MANIGLIA = 10.0  # dimensione in px di scena delle maniglie di resize
@@ -176,6 +177,7 @@ class ImageViewer(QGraphicsView):
         self._zoom = 1.0
         self._bordo = QColor("#E74C3C")
         self._strumento = "nav"
+        self._cursore = CURSORE_DEFAULT
         self._classe_attiva = ""
         self._colori: dict = {}
         self._unita = "px"
@@ -236,7 +238,13 @@ class ImageViewer(QGraphicsView):
             self.setCursor(Qt.ArrowCursor)
         else:
             self.setDragMode(QGraphicsView.NoDrag)
-            self.setCursor(Qt.CrossCursor)
+            self.setCursor(crea_cursore(self._cursore))
+
+    def set_cursore(self, nome: str) -> None:
+        """Cursore per gli strumenti di disegno; 'nav' resta col cursore di sistema."""
+        self._cursore = cursore_valido(nome)
+        if self._strumento != "nav":
+            self.setCursor(crea_cursore(self._cursore))
 
     def set_classe_attiva(self, nome: str) -> None:
         self._classe_attiva = nome
