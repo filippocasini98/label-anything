@@ -737,6 +737,10 @@ class FinestraPrincipale(QMainWindow):
         nome = self.combo_cursore.currentData()
         self.viewer.set_cursore(nome)
         salva_cursore(nome)
+        if self.combo_strumenti.currentData() == "nav":
+            self.stato_label.setText(
+                "Puntatore applicato agli strumenti di disegno: scegline uno (es. Disegna box) per vederlo"
+            )
 
     def _classe_cambiata(self) -> None:
         self.viewer.set_classe_attiva(self.combo_classe.currentText())

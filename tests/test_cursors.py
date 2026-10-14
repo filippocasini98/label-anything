@@ -22,11 +22,16 @@ def qapp():
     yield app
 
 
-def test_registry_sette_cursori_in_ordine_stabile():
+def test_registry_otto_cursori_in_ordine_stabile():
     assert list(CURSORI) == [
-        "crosshair", "precision", "annotation", "target",
-        "punto", "freccia", "invisibile",
+        "crosshair", "croce-schermo", "precision", "annotation",
+        "target", "punto", "freccia", "invisibile",
     ]
+
+
+def test_flag_schermo_intero_solo_su_croce_schermo():
+    for nome, d in CURSORI.items():
+        assert d.schermo_intero == (nome == "croce-schermo")
 
 
 def test_nomi_ed_etichette_univoci():
@@ -52,7 +57,7 @@ def test_factory_cursori_standard(qapp):
     assert crea_cursore("pippo").shape() == Qt.CursorShape.CrossCursor
 
 
-@pytest.mark.parametrize("nome", ["precision", "annotation", "target", "punto"])
+@pytest.mark.parametrize("nome", ["precision", "annotation", "target", "punto", "croce-schermo"])
 def test_factory_cursori_custom(qapp, nome):
     cursore = crea_cursore(nome)
     pm = cursore.pixmap()

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
 )
 
-from labeling_tool.cursors import CURSORE_DEFAULT, crea_cursore, cursore_valido
+from labeling_tool.cursors import CURSORE_DEFAULT, CURSORI, crea_cursore, cursore_valido
 from labeling_tool.model import area_poligono, distanza_px
 
 MANIGLIA = 10.0  # dimensione in px di scena delle maniglie di resize
@@ -143,6 +143,12 @@ class BoxItem(QGraphicsItem):
                 self.set_rect(r)
         event.accept()
 
+    def leaveEvent(self, event) -> None:
+        self._pos_mouse = None
+        if self._croce_schermo:
+            self.viewport().update()
+        super().leaveEvent(event)
+
     def mouseReleaseEvent(self, event) -> None:
         if self._modalita and self.on_modifica and self._prima is not None:
             dopo = self.in_dict()
@@ -178,6 +184,8 @@ class ImageViewer(QGraphicsView):
         self._bordo = QColor("#E74C3C")
         self._strumento = "nav"
         self._cursore = CURSORE_DEFAULT
+        self._croce_schermo = False
+        self._pos_mouse: Optional[QPointF] = None
         self._classe_attiva = ""
         self._colori: dict = {}
         self._unita = "px"
@@ -225,6 +233,13 @@ class ImageViewer(QGraphicsView):
             pen = QPen(self._bordo, 5 / max(self.transform().m11(), 0.01))
             painter.setPen(pen)
             painter.drawRect(self.pixmap_item.boundingRect())
+        if self._croce_schermo and self._strumento != "nav" and self._pos_mouse is not None:
+            spessore = 1.0 / max(self.transform().m11(), 0.01)
+            x, y = self._pos_mouse.x(), self._pos_mouse.y()
+            for colore, fattore in ((QColor(0, 0, 0, 160), 3), (QColor(255, 255, 255), 1)):
+                painter.setPen(QPen(colore, spessore * fattore))
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
 
     # ---------------- configurazione strumenti ----------------
 
@@ -239,12 +254,15 @@ class ImageViewer(QGraphicsView):
         else:
             self.setDragMode(QGraphicsView.NoDrag)
             self.setCursor(crea_cursore(self._cursore))
+        self.viewport().update()
 
     def set_cursore(self, nome: str) -> None:
         """Cursore per gli strumenti di disegno; 'nav' resta col cursore di sistema."""
         self._cursore = cursore_valido(nome)
+        self._croce_schermo = CURSORI[self._cursore].schermo_intero
         if self._strumento != "nav":
             self.setCursor(crea_cursore(self._cursore))
+        self.viewport().update()
 
     def set_classe_attiva(self, nome: str) -> None:
         self._classe_attiva = nome
@@ -503,6 +521,9 @@ class ImageViewer(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
+        if self._croce_schermo:
+            self._pos_mouse = self._punto_scene(event)
+            self.viewport().update()
         if self._strumento in ("box", "oggetto") and self._anteprima_box is not None and self._inizio_drag is not None:
             punto = self._punto_scene(event)
             limite = self.pixmap_item.boundingRect()
@@ -523,6 +544,12 @@ class ImageViewer(QGraphicsView):
             event.accept()
             return
         super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._pos_mouse = None
+        if self._croce_schermo:
+            self.viewport().update()
+        super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:
         if self._strumento in ("box", "oggetto") and self._anteprima_box is not None and self._inizio_drag is not None:

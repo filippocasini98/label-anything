@@ -10,9 +10,10 @@ Permettere all'utente di scegliere il cursore usato dagli strumenti di disegno e
 ## Requisiti (confermati con l'utente)
 
 1. Cursore globale: preferenza d'interfaccia valida per tutti i progetti, persistente tra gli avvii su file di testo `~/.config/labeling-tool/cursore.txt` (stesso pattern di `ultima_cartella.txt` in `io_utils.py`).
-2. Selezione al volo: combobox sempre visibile in toolbar, come gli altri combobox esistenti; nessun riavvio.
-3. Set di 7 cursori:
+2. Selezione al volo: combobox sempre visibile in toolbar, come gli altri combobox esistenti; nessun riavvio. Se lo strumento attivo e' Naviga, un messaggio nella barra di stato ricorda che il puntatore si applica agli strumenti di disegno.
+3. Set di 8 cursori:
    - `crosshair` (default): CrossCursor standard di Qt.
+   - `croce-schermo`: croce a tutto schermo — le linee attraversano tutta l'area immagine passando per il mouse (disegnate come overlay in `drawForeground`, non come pixmap), croce di precisione al centro.
    - `precision`: precision crosshair — croce sottile con gap al centro (pixmap custom).
    - `annotation`: annotation crosshair — croce con cerchietto al centro (pixmap custom).
    - `target`: cerchio con tacche a croce (pixmap custom).

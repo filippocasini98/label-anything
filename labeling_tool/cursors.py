@@ -18,6 +18,7 @@ class CursorDef:
     nome: str
     etichetta: str
     factory: Callable[[], QCursor]
+    schermo_intero: bool = False  # croce lunga disegnata come overlay nella view
 
 
 def _pixmap_logica() -> QPixmap:
@@ -86,6 +87,10 @@ def _forma_punto(p: QPainter, colore: QColor, spessore: float) -> None:
 
 CURSORI: Dict[str, CursorDef] = {
     "crosshair": CursorDef("crosshair", "Crosshair", lambda: QCursor(Qt.CrossCursor)),
+    "croce-schermo": CursorDef(
+        "croce-schermo", "Croce a tutto schermo",
+        lambda: _cursore_custom(_forma_precisione), schermo_intero=True,
+    ),
     "precision": CursorDef("precision", "Precision crosshair", lambda: _cursore_custom(_forma_precisione)),
     "annotation": CursorDef("annotation", "Annotation crosshair", lambda: _cursore_custom(_forma_annotation)),
     "target": CursorDef("target", "Target", lambda: _cursore_custom(_forma_target)),
