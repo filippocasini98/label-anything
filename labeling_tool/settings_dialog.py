@@ -217,7 +217,7 @@ class WizardProgetto(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nuovo progetto di etichettatura")
+        self.setWindowTitle("Nuovo progetto")
         self.setMinimumWidth(640)
         layout = QVBoxLayout(self)
         form_cartella = QFormLayout()
