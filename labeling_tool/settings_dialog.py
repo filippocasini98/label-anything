@@ -28,6 +28,7 @@ from labeling_tool.config import ESTENSIONI_DEFAULT, ProgettoConfig, EtichettaDe
 WORKFLOW_VOCI = {
     "classificazione": "Solo classificazione (etichette per immagine)",
     "classificazione+geometrie": "Classificazione + geometrie (box e poligoni)",
+    "geometrie": "Solo geometrie (box e poligoni, nessuna classificazione immagine)",
 }
 
 
@@ -217,7 +218,7 @@ class WizardProgetto(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nuovo progetto di etichettatura")
+        self.setWindowTitle("Nuovo progetto")
         self.setMinimumWidth(640)
         layout = QVBoxLayout(self)
         form_cartella = QFormLayout()
@@ -243,7 +244,10 @@ class WizardProgetto(QDialog):
         layout.addWidget(bottoni)
 
     def _scegli_cartella(self):
-        cartella = QFileDialog.getExistingDirectory(self, "Seleziona la cartella delle immagini")
+        cartella = QFileDialog.getExistingDirectory(
+            self, "Seleziona la cartella delle immagini", "",
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         if cartella:
             self.cartella_edit.setText(cartella)
 

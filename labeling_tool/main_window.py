@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from labeling_tool.config import ProgettoConfig
+from labeling_tool.cursors import CURSORI, leggi_cursore, salva_cursore
 from labeling_tool.export import (
     esporta_coco,
     esporta_csv,
@@ -133,10 +134,16 @@ class FinestraPrincipale(QMainWindow):
         finestra.salva()
         return finestra
 
+    def _record_completato(self, record: Record) -> bool:
+        """Un'immagine e' completata con le geometrie o con le etichette, a seconda del workflow."""
+        if self.progetto.config.workflow == "geometrie":
+            return bool(record.geometrie)
+        return bool(record.etichette)
+
     def _prima_da_completare(self) -> int:
         for i, percorso in enumerate(self.immagini):
             record = self.progetto.immagini[percorso.name]
-            if not record.etichette and not record.da_revisionare:
+            if not self._record_completato(record) and not record.da_revisionare:
                 return i
         return 0
 
@@ -193,9 +200,12 @@ class FinestraPrincipale(QMainWindow):
         side = QVBoxLayout(pannello)
         side.setSpacing(8)
 
-        side.addWidget(self._sezione("ETICHETTE"))
-        self.pannello_etichette = QVBoxLayout()
-        side.addLayout(self.pannello_etichette)
+        self.sezione_etichette = self._sezione("ETICHETTE")
+        side.addWidget(self.sezione_etichette)
+        self.contenitore_etichette = QWidget()
+        self.pannello_etichette = QVBoxLayout(self.contenitore_etichette)
+        self.pannello_etichette.setContentsMargins(0, 0, 0, 0)
+        side.addWidget(self.contenitore_etichette)
 
         self.check_revisione = QCheckBox("Da revisionare [X]")
         self.check_revisione.stateChanged.connect(self._toggle_revisionare)
@@ -213,19 +223,7 @@ class FinestraPrincipale(QMainWindow):
 
         side.addWidget(self._sezione("STRUMENTI"))
         self.combo_strumenti = QComboBox()
-        self.combo_strumenti.addItem("Naviga (pan)", "nav")
-        self.combo_strumenti.addItem("Seleziona/modifica", "seleziona")
-        self._strumenti_geometrici = []
-        if self.progetto.config.workflow == "classificazione+geometrie":
-            self.combo_strumenti.addItem("Disegna box", "box")
-            self.combo_strumenti.addItem("Disegna poligono", "poligono")
-            self._strumenti_geometrici += ["box", "poligono"]
-        if self.progetto.config.misure_abilitate:
-            self.combo_strumenti.addItem("Misura distanza", "distanza")
-            self.combo_strumenti.addItem("Misura area", "area")
-            self.combo_strumenti.addItem("Conteggio oggetti", "conteggio")
-            self.combo_strumenti.addItem("Dimensioni oggetto", "oggetto")
-            self._strumenti_geometrici += ["distanza", "area", "conteggio", "oggetto"]
+        self._popola_strumenti()
         self.combo_strumenti.currentIndexChanged.connect(self._strumento_cambiato)
         side.addWidget(self.combo_strumenti)
 
@@ -250,10 +248,14 @@ class FinestraPrincipale(QMainWindow):
         eff = QHBoxLayout()
         self.check_grigi = QCheckBox("Grigi [G]")
         self.check_equalizza = QCheckBox("Equalizza [H]")
+        self.check_dimensioni = QCheckBox("Dimensioni box")
+        self.check_dimensioni.setChecked(True)
+        self.check_dimensioni.toggled.connect(self._dimensioni_cambiate)
         self.check_grigi.stateChanged.connect(self._visualizzazione_modificata)
         self.check_equalizza.stateChanged.connect(self._visualizzazione_modificata)
         eff.addWidget(self.check_grigi)
         eff.addWidget(self.check_equalizza)
+        eff.addWidget(self.check_dimensioni)
         side.addWidget(QLabel("Luminosità"))
         side.addWidget(self.slider_luminosita)
         side.addWidget(QLabel("Contrasto"))
@@ -313,7 +315,38 @@ class FinestraPrincipale(QMainWindow):
         self.combo_filtro.addItems(voci)
         self.combo_filtro.blockSignals(False)
 
+    def _popola_strumenti(self) -> None:
+        """Ricostruisce il combobox strumenti dalla configurazione corrente.
+
+        Conserva lo strumento attivo se resta disponibile, altrimenti
+        torna a 'Naviga' e lo applica anche al viewer."""
+        self.combo_strumenti.blockSignals(True)
+        corrente = self.combo_strumenti.currentData()
+        self.combo_strumenti.clear()
+        self.combo_strumenti.addItem("Naviga (pan)", "nav")
+        self.combo_strumenti.addItem("Seleziona/modifica", "seleziona")
+        self._strumenti_geometrici = []
+        if self.progetto.config.workflow in ("classificazione+geometrie", "geometrie"):
+            self.combo_strumenti.addItem("Disegna box", "box")
+            self.combo_strumenti.addItem("Disegna poligono", "poligono")
+            self._strumenti_geometrici += ["box", "poligono"]
+        if self.progetto.config.misure_abilitate:
+            self.combo_strumenti.addItem("Misura distanza", "distanza")
+            self.combo_strumenti.addItem("Misura area", "area")
+            self.combo_strumenti.addItem("Conteggio oggetti", "conteggio")
+            self.combo_strumenti.addItem("Dimensioni oggetto", "oggetto")
+            self._strumenti_geometrici += ["distanza", "area", "conteggio", "oggetto"]
+        indice = self.combo_strumenti.findData(corrente)
+        if indice < 0:
+            indice = 0
+            self.viewer.set_strumento("nav")
+        self.combo_strumenti.setCurrentIndex(indice)
+        self.combo_strumenti.blockSignals(False)
+
     def _popola_etichette(self) -> None:
+        solo_geometrie = self.progetto.config.workflow == "geometrie"
+        self.sezione_etichette.setVisible(not solo_geometrie)
+        self.contenitore_etichette.setVisible(not solo_geometrie)
         while self.pannello_etichette.count():
             item = self.pannello_etichette.takeAt(0)
             widget = item.widget()
@@ -358,6 +391,17 @@ class FinestraPrincipale(QMainWindow):
         aggiungi("Prossima da etichettare", "N", self.prossima_da_etichettare)
 
         toolbar.addWidget(self._bottone_export())
+
+        self.combo_cursore = QComboBox()
+        self.combo_cursore.setToolTip("Puntatore per gli strumenti di disegno")
+        for definizione in CURSORI.values():
+            self.combo_cursore.addItem(definizione.etichetta, definizione.nome)
+        nome_cursore = leggi_cursore()
+        indice = self.combo_cursore.findData(nome_cursore)
+        self.combo_cursore.setCurrentIndex(max(indice, 0))
+        self.combo_cursore.currentIndexChanged.connect(self._cursore_cambiato)
+        toolbar.addWidget(self.combo_cursore)
+        self.viewer.set_cursore(nome_cursore)
 
         for e in self.progetto.config.etichette:
             if e.tasto:
@@ -441,6 +485,10 @@ class FinestraPrincipale(QMainWindow):
     def _colore_record(self, record: Record) -> str:
         if record.da_revisionare:
             return COLORE_REVISIONE
+        if self.progetto.config.workflow == "geometrie":
+            if record.geometrie:
+                return self.progetto.config.colore_di(record.geometrie[0].get("classe", ""))
+            return COLORE_NON_ASSEGNATA
         if record.etichette:
             return self.progetto.config.colore_di(record.etichette[0])
         return COLORE_NON_ASSEGNATA
@@ -467,7 +515,10 @@ class FinestraPrincipale(QMainWindow):
         self.viewer.mostra_annotazioni(record)
 
         self.titolo.setText(f"{indice + 1}/{len(self.immagini)} — {percorso.name}")
-        badge = " • ".join(record.etichette).upper() if record.etichette else "NON ETICHETTATA"
+        if self.progetto.config.workflow == "geometrie":
+            badge = f"{len(record.geometrie)} OGGETTI" if record.geometrie else "NON ETICHETTATA"
+        else:
+            badge = " • ".join(record.etichette).upper() if record.etichette else "NON ETICHETTATA"
         if record.da_revisionare:
             badge += " • DA REVISIONARE"
         if record.revisionata:
@@ -512,7 +563,7 @@ class FinestraPrincipale(QMainWindow):
 
     def _aggiorna_progresso(self) -> None:
         completate = sum(
-            bool(self.progetto.immagini[p.name].etichette) for p in self.immagini
+            self._record_completato(self.progetto.immagini[p.name]) for p in self.immagini
         )
         self.progresso.setMaximum(len(self.immagini))
         self.progresso.setValue(completate)
@@ -705,8 +756,32 @@ class FinestraPrincipale(QMainWindow):
     def _strumento_cambiato(self) -> None:
         self.viewer.set_strumento(self.combo_strumenti.currentData())
 
+    def _cursore_cambiato(self) -> None:
+        nome = self.combo_cursore.currentData()
+        self.viewer.set_cursore(nome)
+        salva_cursore(nome)
+        if self.combo_strumenti.currentData() == "nav":
+            self.stato_label.setText(
+                "Puntatore applicato agli strumenti di disegno: scegline uno (es. Disegna box) per vederlo"
+            )
+
+    def _dimensioni_cambiate(self) -> None:
+        self.viewer.set_mostra_dimensioni(self.check_dimensioni.isChecked())
+        self.viewer.mostra_annotazioni(self._record_corrente())
+
     def _classe_cambiata(self) -> None:
-        self.viewer.set_classe_attiva(self.combo_classe.currentText())
+        nome = self.combo_classe.currentText()
+        self.viewer.set_classe_attiva(nome)
+        # un box selezionato cambia etichetta quando si sceglie un'altra classe
+        indice_box = self.viewer.indice_selezionato()
+        if indice_box >= 0:
+            record = self._record_corrente()
+            nuovo = record.copia()
+            if 0 <= indice_box < len(nuovo.geometrie) and nuovo.geometrie[indice_box].get("tipo") == "box":
+                nuovo.geometrie[indice_box]["classe"] = nome
+                self._modifica_record(nuovo)
+                self.viewer.mostra_annotazioni(nuovo)
+                self._programma_salvataggio()
 
     # ------------------------------------------------------------ salvataggio
 
@@ -775,7 +850,7 @@ class FinestraPrincipale(QMainWindow):
             r = self.progetto.immagini[percorso.name]
             ok = (
                 testo == "Tutte"
-                or (testo == "Non etichettate" and not r.etichette)
+                or (testo == "Non etichettate" and not self._record_completato(r))
                 or (testo == "Da revisionare" and r.da_revisionare)
                 or (testo == "Revisionate" and r.revisionata)
                 or (testo == "Con note" and bool(r.note))
@@ -809,7 +884,7 @@ class FinestraPrincipale(QMainWindow):
     def _successiva_preferendo_da_fare(self) -> None:
         for i in range(self.indice + 1, len(self.immagini)):
             r = self.progetto.immagini[self.immagini[i].name]
-            if not r.etichette and not r.da_revisionare:
+            if not self._record_completato(r) and not r.da_revisionare:
                 self.mostra_indice(i)
                 return
         self.successiva()
@@ -818,7 +893,7 @@ class FinestraPrincipale(QMainWindow):
         for offset in range(1, len(self.immagini) + 1):
             i = (self.indice + offset) % len(self.immagini)
             r = self.progetto.immagini[self.immagini[i].name]
-            if not r.etichette:
+            if not self._record_completato(r):
                 self.mostra_indice(i)
                 return
         self.stato_label.setText("Tutte le immagini sono etichettate")
@@ -845,6 +920,7 @@ class FinestraPrincipale(QMainWindow):
         self.viewer.set_unita(self.progetto.config.unita_misura, self.progetto.config.scala_px_per_unita)
         self._popola_etichette()
         self._popola_filtri()
+        self._popola_strumenti()
         self.setWindowTitle(f"Label Anything - {self.progetto.config.nome_progetto}")
         self.indice = min(self.indice, max(0, len(self.immagini) - 1))
         self.salva()
@@ -866,7 +942,10 @@ class FinestraPrincipale(QMainWindow):
         return dimensioni
 
     def _destinazione(self, messaggio: str) -> Optional[Path]:
-        cartella = QFileDialog.getExistingDirectory(self, messaggio, str(self.cartella))
+        cartella = QFileDialog.getExistingDirectory(
+            self, messaggio, str(self.cartella),
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         return Path(cartella) if cartella else None
 
     def _export_csv(self) -> None:
@@ -924,7 +1003,10 @@ class FinestraPrincipale(QMainWindow):
         self.stato_label.setText(f"Esportato {percorso}")
 
     def apri_cartella(self) -> None:
-        cartella = QFileDialog.getExistingDirectory(self, "Seleziona la cartella delle immagini", str(self.cartella))
+        cartella = QFileDialog.getExistingDirectory(
+            self, "Seleziona la cartella delle immagini", str(self.cartella),
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         if not cartella:
             return
         self.salva()

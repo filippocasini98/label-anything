@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
 )
 
+from labeling_tool.cursors import CURSORE_DEFAULT, CURSORI, crea_cursore, cursore_valido
 from labeling_tool.model import area_poligono, distanza_px
 
 MANIGLIA = 10.0  # dimensione in px di scena delle maniglie di resize
@@ -142,6 +143,12 @@ class BoxItem(QGraphicsItem):
                 self.set_rect(r)
         event.accept()
 
+    def leaveEvent(self, event) -> None:
+        self._pos_mouse = None
+        if self._croce_schermo:
+            self.viewport().update()
+        super().leaveEvent(event)
+
     def mouseReleaseEvent(self, event) -> None:
         if self._modalita and self.on_modifica and self._prima is not None:
             dopo = self.in_dict()
@@ -176,14 +183,19 @@ class ImageViewer(QGraphicsView):
         self._zoom = 1.0
         self._bordo = QColor("#E74C3C")
         self._strumento = "nav"
+        self._cursore = CURSORE_DEFAULT
+        self._croce_schermo = False
+        self._pos_mouse: Optional[QPointF] = None
         self._classe_attiva = ""
         self._colori: dict = {}
         self._unita = "px"
         self._scala = 1.0
+        self._mostra_dimensioni = True
         self._boxes: List[BoxItem] = []
         self._altri_items: List[QGraphicsItem] = []
         self._temporanei: List[QGraphicsItem] = []
         self._punti_correnti: List[QPointF] = []
+        self._marcatore_primo: Optional[QGraphicsEllipseItem] = None
         self._inizio_drag: Optional[QPointF] = None
         self._anteprima_box: Optional[QGraphicsRectItem] = None
         self._distanza_p1: Optional[QPointF] = None
@@ -214,6 +226,14 @@ class ImageViewer(QGraphicsView):
         self.zoom_by(1.20 if event.angleDelta().y() > 0 else 1 / 1.20)
 
     def mouseDoubleClickEvent(self, event) -> None:
+        if self._strumento == "poligono" and self._punti_correnti:
+            self._chiudi_poligono()
+            event.accept()
+            return
+        if self._strumento == "area" and self._punti_correnti:
+            self._chiudi_area()
+            event.accept()
+            return
         self.reset_view()
         super().mouseDoubleClickEvent(event)
 
@@ -223,6 +243,13 @@ class ImageViewer(QGraphicsView):
             pen = QPen(self._bordo, 5 / max(self.transform().m11(), 0.01))
             painter.setPen(pen)
             painter.drawRect(self.pixmap_item.boundingRect())
+        if self._croce_schermo and self._strumento != "nav" and self._pos_mouse is not None:
+            spessore = 1.0 / max(self.transform().m11(), 0.01)
+            x, y = self._pos_mouse.x(), self._pos_mouse.y()
+            for colore, fattore in ((QColor(0, 0, 0, 160), 3), (QColor(255, 255, 255), 1)):
+                painter.setPen(QPen(colore, spessore * fattore))
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
 
     # ---------------- configurazione strumenti ----------------
 
@@ -236,7 +263,16 @@ class ImageViewer(QGraphicsView):
             self.setCursor(Qt.ArrowCursor)
         else:
             self.setDragMode(QGraphicsView.NoDrag)
-            self.setCursor(Qt.CrossCursor)
+            self.setCursor(crea_cursore(self._cursore))
+        self.viewport().update()
+
+    def set_cursore(self, nome: str) -> None:
+        """Cursore per gli strumenti di disegno; 'nav' resta col cursore di sistema."""
+        self._cursore = cursore_valido(nome)
+        self._croce_schermo = CURSORI[self._cursore].schermo_intero
+        if self._strumento != "nav":
+            self.setCursor(crea_cursore(self._cursore))
+        self.viewport().update()
 
     def set_classe_attiva(self, nome: str) -> None:
         self._classe_attiva = nome
@@ -247,6 +283,10 @@ class ImageViewer(QGraphicsView):
 
     def set_colori(self, colori: dict) -> None:
         self._colori = dict(colori)
+
+    def set_mostra_dimensioni(self, attivo: bool) -> None:
+        """Mostra/nasconde le dimensioni sopra box e poligoni."""
+        self._mostra_dimensioni = bool(attivo)
 
     # ---------------- annotazioni ----------------
 
@@ -264,6 +304,7 @@ class ImageViewer(QGraphicsView):
         self._temporanei.clear()
         self._punti_correnti.clear()
         self._distanza_p1 = None
+        self._marcatore_primo = None
         self._anteprima_box = None
 
     def mostra_annotazioni(self, record) -> None:
@@ -281,8 +322,11 @@ class ImageViewer(QGraphicsView):
                 )
                 self.scene().addItem(item)
                 self._boxes.append(item)
-                testo_box = f"{classe}  {self._testo_dimensioni_box(g['w'], g['h'])}"
-                self._testo_etichetta(testo_box, QPointF(g["x"], max(0.0, g["y"] - 18)), colore)
+                if self._mostra_dimensioni:
+                    self._testo_etichetta(
+                        self._testo_dimensioni_box(g["w"], g["h"]),
+                        QPointF(g["x"], max(0.0, g["y"] - 18)), colore,
+                    )
             elif g.get("tipo") == "poligono":
                 item = QGraphicsPolygonItem(QPolygonF([QPointF(*p) for p in g["punti"]]))
                 qcolore = QColor(colore)
@@ -291,10 +335,9 @@ class ImageViewer(QGraphicsView):
                 item.setOpacity(0.45)
                 self.scene().addItem(item)
                 self._altri_items.append(item)
-                if g["punti"]:
-                    testo_poligono = f"{classe}  {self._testo_dimensioni_poligono(g['punti'])}"
+                if g["punti"] and self._mostra_dimensioni:
                     self._testo_etichetta(
-                        testo_poligono,
+                        self._testo_dimensioni_poligono(g["punti"]),
                         QPointF(g["punti"][0][0], max(0.0, g["punti"][0][1] - 18)),
                         colore,
                     )
@@ -382,27 +425,15 @@ class ImageViewer(QGraphicsView):
         return f"{larghezza:.1f}x{altezza:.1f}px A: {area_px:.0f}px2"
 
     def _testo_dimensioni_box(self, larghezza: float, altezza: float) -> str:
-        """Grandezza di un bounding box: px e, se configurata, l'unita' reale."""
-        if self._unita and self._unita != "px":
-            return (
-                f"{larghezza:.0f}x{altezza:.0f}px "
-                f"({larghezza / self._scala:.2f}x{altezza / self._scala:.2f} {self._unita})"
-            )
-        return f"{larghezza:.0f}x{altezza:.0f}px"
+        """Grandezza di un bounding box in pixel: solo i numeri."""
+        return f"{larghezza:.0f}x{altezza:.0f}"
 
     def _testo_dimensioni_poligono(self, punti) -> str:
-        """Grandezza di un poligono: bounding box e area, in px e nell'unita' reale."""
-        from labeling_tool.model import area_poligono, dimensioni_bbox_poligono
+        """Bounding box del poligono in pixel: solo i numeri."""
+        from labeling_tool.model import dimensioni_bbox_poligono
 
         larghezza, altezza = dimensioni_bbox_poligono(punti)
-        area_px = area_poligono(punti)
-        if self._unita and self._unita != "px":
-            return (
-                f"{larghezza:.0f}x{altezza:.0f}px "
-                f"({larghezza / self._scala:.2f}x{altezza / self._scala:.2f} {self._unita}) "
-                f"A: {area_px / self._scala ** 2:.2f} {self._unita}2"
-            )
-        return f"{larghezza:.0f}x{altezza:.0f}px A: {area_px:.0f}px2"
+        return f"{larghezza:.0f}x{altezza:.0f}"
 
     # ---------------- callback item ----------------
 
@@ -432,6 +463,7 @@ class ImageViewer(QGraphicsView):
         self._temporanei.clear()
         self._punti_correnti.clear()
         self._distanza_p1 = None
+        self._marcatore_primo = None
         if self._anteprima_box is not None:
             try:
                 self.scene().removeItem(self._anteprima_box)
@@ -475,11 +507,28 @@ class ImageViewer(QGraphicsView):
                 })
             event.accept()
         elif self._strumento in ("poligono", "area"):
+            # con almeno 3 vertici, cliccare di nuovo sul primo chiude la figura
+            if len(self._punti_correnti) >= 3:
+                distanza_primo = (event.position() - self.mapFromScene(self._punti_correnti[0])).manhattanLength()
+                if distanza_primo <= 8.0:
+                    if self._strumento == "poligono":
+                        self._chiudi_poligono()
+                    else:
+                        self._chiudi_area()
+                    event.accept()
+                    return
             self._punti_correnti.append(punto)
             marcatore = QGraphicsEllipseItem(punto.x() - 3, punto.y() - 3, 6, 6)
             marcatore.setPen(QPen(QColor("#FFD700"), 1))
             marcatore.setBrush(QBrush(QColor("#FFD700")))
             self._aggiungi_temporaneo(marcatore)
+            if len(self._punti_correnti) == 1:
+                self._marcatore_primo = marcatore
+            elif len(self._punti_correnti) == 3 and self._marcatore_primo is not None:
+                # figura chiudibile: il primo vertice si evidenzia con un anello bianco
+                r = self._marcatore_primo.rect()
+                self._marcatore_primo.setRect(r.x() - 2, r.y() - 2, r.width() + 4, r.height() + 4)
+                self._marcatore_primo.setPen(QPen(QColor("#FFFFFF"), 2))
             event.accept()
         elif self._strumento == "conteggio":
             self.misuraAggiunta.emit({
@@ -495,6 +544,9 @@ class ImageViewer(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
+        if self._croce_schermo:
+            self._pos_mouse = self._punto_scene(event)
+            self.viewport().update()
         if self._strumento in ("box", "oggetto") and self._anteprima_box is not None and self._inizio_drag is not None:
             punto = self._punto_scene(event)
             limite = self.pixmap_item.boundingRect()
@@ -516,6 +568,12 @@ class ImageViewer(QGraphicsView):
             return
         super().mouseMoveEvent(event)
 
+    def leaveEvent(self, event) -> None:
+        self._pos_mouse = None
+        if self._croce_schermo:
+            self.viewport().update()
+        super().leaveEvent(event)
+
     def mouseReleaseEvent(self, event) -> None:
         if self._strumento in ("box", "oggetto") and self._anteprima_box is not None and self._inizio_drag is not None:
             rett = self._anteprima_box.rect().normalized()
@@ -535,6 +593,23 @@ class ImageViewer(QGraphicsView):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def event(self, e) -> bool:
+        # Mentre si disegna, Invio/Esc appartengono al disegno: senza questo
+        # reclamo le scorciatoie globali della finestra se li rubano.
+        if e.type() == QEvent.ShortcutOverride and self._disegno_in_corso():
+            if e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
+                e.accept()
+                return True
+        return super().event(e)
+
+    def _disegno_in_corso(self) -> bool:
+        return bool(
+            self._punti_correnti
+            or self._anteprima_box is not None
+            or self._distanza_p1 is not None
+            or self._temporanei
+        )
 
     def keyPressEvent(self, event) -> None:
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):

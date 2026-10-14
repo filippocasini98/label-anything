@@ -23,7 +23,10 @@ def scegli_cartella(app: QApplication) -> Optional[Path]:
         return ultima
     from PySide6.QtWidgets import QFileDialog
 
-    scelta = QFileDialog.getExistingDirectory(None, "Seleziona la cartella delle immagini")
+    scelta = QFileDialog.getExistingDirectory(
+        None, "Seleziona la cartella delle immagini", "",
+        QFileDialog.Option.DontUseNativeDialog,
+    )
     return Path(scelta) if scelta else None
 
 
