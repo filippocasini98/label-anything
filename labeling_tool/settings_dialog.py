@@ -243,7 +243,10 @@ class WizardProgetto(QDialog):
         layout.addWidget(bottoni)
 
     def _scegli_cartella(self):
-        cartella = QFileDialog.getExistingDirectory(self, "Seleziona la cartella delle immagini")
+        cartella = QFileDialog.getExistingDirectory(
+            self, "Seleziona la cartella delle immagini", "",
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         if cartella:
             self.cartella_edit.setText(cartella)
 

@@ -912,7 +912,10 @@ class FinestraPrincipale(QMainWindow):
         return dimensioni
 
     def _destinazione(self, messaggio: str) -> Optional[Path]:
-        cartella = QFileDialog.getExistingDirectory(self, messaggio, str(self.cartella))
+        cartella = QFileDialog.getExistingDirectory(
+            self, messaggio, str(self.cartella),
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         return Path(cartella) if cartella else None
 
     def _export_csv(self) -> None:
@@ -970,7 +973,10 @@ class FinestraPrincipale(QMainWindow):
         self.stato_label.setText(f"Esportato {percorso}")
 
     def apri_cartella(self) -> None:
-        cartella = QFileDialog.getExistingDirectory(self, "Seleziona la cartella delle immagini", str(self.cartella))
+        cartella = QFileDialog.getExistingDirectory(
+            self, "Seleziona la cartella delle immagini", str(self.cartella),
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         if not cartella:
             return
         self.salva()
