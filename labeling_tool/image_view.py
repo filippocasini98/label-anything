@@ -195,6 +195,7 @@ class ImageViewer(QGraphicsView):
         self._altri_items: List[QGraphicsItem] = []
         self._temporanei: List[QGraphicsItem] = []
         self._punti_correnti: List[QPointF] = []
+        self._marcatore_primo: Optional[QGraphicsEllipseItem] = None
         self._inizio_drag: Optional[QPointF] = None
         self._anteprima_box: Optional[QGraphicsRectItem] = None
         self._distanza_p1: Optional[QPointF] = None
@@ -303,6 +304,7 @@ class ImageViewer(QGraphicsView):
         self._temporanei.clear()
         self._punti_correnti.clear()
         self._distanza_p1 = None
+        self._marcatore_primo = None
         self._anteprima_box = None
 
     def mostra_annotazioni(self, record) -> None:
@@ -461,6 +463,7 @@ class ImageViewer(QGraphicsView):
         self._temporanei.clear()
         self._punti_correnti.clear()
         self._distanza_p1 = None
+        self._marcatore_primo = None
         if self._anteprima_box is not None:
             try:
                 self.scene().removeItem(self._anteprima_box)
@@ -504,11 +507,28 @@ class ImageViewer(QGraphicsView):
                 })
             event.accept()
         elif self._strumento in ("poligono", "area"):
+            # con almeno 3 vertici, cliccare di nuovo sul primo chiude la figura
+            if len(self._punti_correnti) >= 3:
+                distanza_primo = (event.position() - self.mapFromScene(self._punti_correnti[0])).manhattanLength()
+                if distanza_primo <= 8.0:
+                    if self._strumento == "poligono":
+                        self._chiudi_poligono()
+                    else:
+                        self._chiudi_area()
+                    event.accept()
+                    return
             self._punti_correnti.append(punto)
             marcatore = QGraphicsEllipseItem(punto.x() - 3, punto.y() - 3, 6, 6)
             marcatore.setPen(QPen(QColor("#FFD700"), 1))
             marcatore.setBrush(QBrush(QColor("#FFD700")))
             self._aggiungi_temporaneo(marcatore)
+            if len(self._punti_correnti) == 1:
+                self._marcatore_primo = marcatore
+            elif len(self._punti_correnti) == 3 and self._marcatore_primo is not None:
+                # figura chiudibile: il primo vertice si evidenzia con un anello bianco
+                r = self._marcatore_primo.rect()
+                self._marcatore_primo.setRect(r.x() - 2, r.y() - 2, r.width() + 4, r.height() + 4)
+                self._marcatore_primo.setPen(QPen(QColor("#FFFFFF"), 2))
             event.accept()
         elif self._strumento == "conteggio":
             self.misuraAggiunta.emit({

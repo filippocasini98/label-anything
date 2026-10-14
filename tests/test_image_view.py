@@ -110,9 +110,9 @@ def test_doppio_clic_chiude_il_poligono(qapp):
         _click(viewer, x, y)
     from PySide6.QtGui import QMouseEvent
     from PySide6.QtCore import QEvent as QE
-    ev = QMouseEvent(QE.MouseButtonDblClick, QPointF(10, 10), QPointF(10, 10),
+    ev = QMouseEvent(QE.MouseButtonDblClick, QPointF(20, 25), QPointF(20, 25),
                      Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-    _click(viewer, 10, 10)  # il primo clic del doppio clic: aggiunge l'ultimo vertice
+    _click(viewer, 20, 25)  # il primo clic del doppio clic: aggiunge l'ultimo vertice
     viewer.mouseDoubleClickEvent(ev)
     assert len(aggiunte) == 1
     assert len(aggiunte[0]["punti"]) == 4
@@ -142,3 +142,29 @@ def test_shortcut_override_reclama_invio_solo_durante_il_disegno(qapp):
     _click(viewer, 10, 10)
     tasto = QKeyEvent(QE.ShortcutOverride, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
     assert viewer.event(tasto) is True   # disegno in corso: Invio va al poligono
+
+
+def test_clic_sul_primo_punto_chiude_il_poligono(qapp):
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("poligono")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    for x, y in ((10, 10), (40, 10), (40, 30)):
+        _click(viewer, x, y)
+    assert not aggiunte
+    _click(viewer, 10, 10)  # clic di nuovo sul primo vertice
+    assert len(aggiunte) == 1
+    assert len(aggiunte[0]["punti"]) == 3  # il clic di chiusura non aggiunge vertici
+    assert viewer._punti_correnti == []
+
+
+def test_clic_vicino_ma_non_sul_primo_punto_aggiunge(qapp):
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("poligono")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    for x, y in ((10, 10), (40, 10), (40, 30)):
+        _click(viewer, x, y)
+    _click(viewer, 20, 25)  # lontano dal primo vertice: nuovo punto, nessuna chiusura
+    assert not aggiunte
+    assert len(viewer._punti_correnti) == 4
