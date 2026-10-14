@@ -214,19 +214,7 @@ class FinestraPrincipale(QMainWindow):
 
         side.addWidget(self._sezione("STRUMENTI"))
         self.combo_strumenti = QComboBox()
-        self.combo_strumenti.addItem("Naviga (pan)", "nav")
-        self.combo_strumenti.addItem("Seleziona/modifica", "seleziona")
-        self._strumenti_geometrici = []
-        if self.progetto.config.workflow == "classificazione+geometrie":
-            self.combo_strumenti.addItem("Disegna box", "box")
-            self.combo_strumenti.addItem("Disegna poligono", "poligono")
-            self._strumenti_geometrici += ["box", "poligono"]
-        if self.progetto.config.misure_abilitate:
-            self.combo_strumenti.addItem("Misura distanza", "distanza")
-            self.combo_strumenti.addItem("Misura area", "area")
-            self.combo_strumenti.addItem("Conteggio oggetti", "conteggio")
-            self.combo_strumenti.addItem("Dimensioni oggetto", "oggetto")
-            self._strumenti_geometrici += ["distanza", "area", "conteggio", "oggetto"]
+        self._popola_strumenti()
         self.combo_strumenti.currentIndexChanged.connect(self._strumento_cambiato)
         side.addWidget(self.combo_strumenti)
 
@@ -313,6 +301,34 @@ class FinestraPrincipale(QMainWindow):
         voci += [f"Etichetta: {e.nome}" for e in self.progetto.config.etichette]
         self.combo_filtro.addItems(voci)
         self.combo_filtro.blockSignals(False)
+
+    def _popola_strumenti(self) -> None:
+        """Ricostruisce il combobox strumenti dalla configurazione corrente.
+
+        Conserva lo strumento attivo se resta disponibile, altrimenti
+        torna a 'Naviga' e lo applica anche al viewer."""
+        self.combo_strumenti.blockSignals(True)
+        corrente = self.combo_strumenti.currentData()
+        self.combo_strumenti.clear()
+        self.combo_strumenti.addItem("Naviga (pan)", "nav")
+        self.combo_strumenti.addItem("Seleziona/modifica", "seleziona")
+        self._strumenti_geometrici = []
+        if self.progetto.config.workflow == "classificazione+geometrie":
+            self.combo_strumenti.addItem("Disegna box", "box")
+            self.combo_strumenti.addItem("Disegna poligono", "poligono")
+            self._strumenti_geometrici += ["box", "poligono"]
+        if self.progetto.config.misure_abilitate:
+            self.combo_strumenti.addItem("Misura distanza", "distanza")
+            self.combo_strumenti.addItem("Misura area", "area")
+            self.combo_strumenti.addItem("Conteggio oggetti", "conteggio")
+            self.combo_strumenti.addItem("Dimensioni oggetto", "oggetto")
+            self._strumenti_geometrici += ["distanza", "area", "conteggio", "oggetto"]
+        indice = self.combo_strumenti.findData(corrente)
+        if indice < 0:
+            indice = 0
+            self.viewer.set_strumento("nav")
+        self.combo_strumenti.setCurrentIndex(indice)
+        self.combo_strumenti.blockSignals(False)
 
     def _popola_etichette(self) -> None:
         while self.pannello_etichette.count():
@@ -862,6 +878,7 @@ class FinestraPrincipale(QMainWindow):
         self.viewer.set_unita(self.progetto.config.unita_misura, self.progetto.config.scala_px_per_unita)
         self._popola_etichette()
         self._popola_filtri()
+        self._popola_strumenti()
         self.setWindowTitle(f"Label Anything - {self.progetto.config.nome_progetto}")
         self.indice = min(self.indice, max(0, len(self.immagini) - 1))
         self.salva()
