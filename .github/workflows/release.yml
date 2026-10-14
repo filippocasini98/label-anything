@@ -1,0 +1,53 @@
+name: Release automatica al merge
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calcola la prossima versione
+        id: versione
+        run: |
+          ultima=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$ultima" ]; then
+            echo "prossima=v1.0.0" >> "$GITHUB_OUTPUT"
+            echo "precedente=" >> "$GITHUB_OUTPUT"
+          else
+            minor=$(echo "$ultima" | sed -E 's/^v[0-9]+\.([0-9]+)\.[0-9]+$/\1/')
+            echo "prossima=v1.$((minor + 1)).0" >> "$GITHUB_OUTPUT"
+            echo "precedente=$ultima" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepara le note della release
+        run: |
+          {
+            echo "Novita' dalla versione ${precedente:-inizio}:"
+            echo
+            git log --pretty=format:'- %s' "${precedente}..HEAD" 2>/dev/null || git log --pretty=format:'- %s' HEAD
+          } > note.md
+        env:
+          precedente: ${{ steps.versione.outputs.precedente }}
+
+      - name: Pacchetto Source-code.zip
+        run: git archive --format=zip -o Source-code.zip "${{ steps.versione.outputs.prossima }}"
+
+      - name: Crea tag e release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prossima: ${{ steps.versione.outputs.prossima }}
+        run: |
+          git tag "$prossima"
+          git push origin "$prossima"
+          gh release create "$prossima" Source-code.zip \
+            --title "Label Anything $prossima" \
+            --notes-file note.md
