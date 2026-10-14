@@ -54,12 +54,14 @@ con un `Contents/Info.plist` che punti a `CFBundleExecutable` `LabelAnything` (v
 ## Funzioni
 
 - **Classificazione**: etichette con tasti scorciatoia configurabili; modalità mono-label (auto-avanzamento dopo l'assegnazione) o multi-label (toggle).
-- **Geometrie** (workflow "classificazione + geometrie"): bounding box trascinate sullo schermo, ridimensionabili con 8 maniglie e spostabili; poligoni a clic, chiusi con Invio. Classe per oggetto selezionabile. La **grandezza di ogni geometria** è mostrata sull'immagine, riportata in `etichette.csv` e aggregata per classe in `statistiche.csv`: per i box larghezza/altezza/area, per i poligoni bounding box e area (media, minimo, massimo, in px o nell'unità configurata).
+- **Geometrie** (workflow "classificazione + geometrie" oppure "solo geometrie"): bounding box trascinate sullo schermo, ridimensionabili con 8 maniglie e spostabili; poligoni a clic, chiusi con Invio. Classe per oggetto selezionabile. La **grandezza di ogni geometria** è mostrata sull'immagine, riportata in `etichette.csv` e aggregata per classe in `statistiche.csv`: per i box larghezza/altezza/area, per i poligoni bounding box e area (media, minimo, massimo, in px o nell'unità configurata).
 - **Misure** (se abilitate): distanza tra due clic (px e unità configurabile via scala px/unità), area di poligono, conteggio oggetti a clic, **dimensioni di oggetti** (rettangolo trascinato: larghezza, altezza e area in px e nell'unità configurata - utile ad es. per misurare stomi in immagini al microscopio elettronico). Tutte le misure sono salvate e rimostrate.
 - **Analisi visiva**: luminosità, contrasto, scala di grigi, equalizzazione CLAHE, zoom/pan.
 - **Statistiche**: distribuzione etichette, progresso, revisioni, conteggio geometrie e misure; esportabili in CSV.
 - **Filtri**: per stato (non etichettate, da revisionare, revisionate, con note, con geometrie) e per etichetta.
 - **Undo/redo** su ogni modifica, autosave atomico a 350 ms e su chiusura.
+- **Workflow "Solo geometrie"**: disegno di box e poligoni senza classificazione dell'immagine; la sezione etichette si nasconde e un'immagine è completata quando ha geometrie. Le etichette restano obblatorie perché sono le classi degli oggetti.
+- **Selettore del puntatore**: 8 cursori per gli strumenti di disegno e misura (crosshair, croce a tutto schermo, precision, annotation, target, punto, freccia, invisibile), selezionabili al volo da un combobox in toolbar e salvati come preferenza globale.
 
 ## Scorciatoie
 
@@ -69,6 +71,7 @@ con un `Contents/Info.plist` che punti a `CFBundleExecutable` `LabelAnything` (v
 - `A`/`D` precedente/successiva, `X` da revisionare, `Invio` conferma revisione
 - `G` grigi, `H` equalizza, `R` ripristina visualizzazione, `+`/`-` zoom
 - `Invio` chiude poligono/area, `Esc` annulla disegno, `Delete` elimina geometria/misura selezionata (o le etichette)
+- Il poligono/area si chiude anche con un clic sul primo vertice oppure con doppio clic; il combo etichette cambia la classe del box selezionato
 
 ## Dati ed export
 
@@ -91,7 +94,9 @@ Export aggiuntivi dal menu "Export": COCO detection/segmentation, YOLO detection
 ./venv/bin/python -m pytest        # test logica pura (config, model, io, export)
 ```
 
-Struttura: `labeling_tool/` — `config.py` (schema e validazione), `model.py` (record, progetto, undo/redo, calcoli), `io_utils.py` (scansione e cache), `export.py` (formati, funzioni pure), `image_view.py` (viewer annotazioni), `settings_dialog.py` (wizard ed editor), `main_window.py` (UI principale).
+Struttura: `labeling_tool/` — `config.py` (schema e validazione), `model.py` (record, progetto, undo/redo, calcoli), `io_utils.py` (scansione e cache), `export.py` (formati, funzioni pure), `cursors.py` (cursori di annotazione), `image_view.py` (viewer annotazioni), `settings_dialog.py` (wizard ed editor), `main_window.py` (UI principale).
+
+Ogni merge in `main` produce automaticamente una release (tag con bump della minor e `Source-code.zip` allegato) tramite GitHub Actions (`.github/workflows/release.yml`).
 
 ## Condividere il programma
 
