@@ -6,6 +6,20 @@ Strumento desktop (PySide6 + OpenCV) per etichettare, annotare e analizzare qual
 
 Python 3.9 o superiore (macOS, Windows o Linux). Tutto il resto viene installato automaticamente.
 
+## Scarica
+
+**[⬇️ Scarica l'ultima versione](https://github.com/filippocasini98/label-anything/releases/latest)** dalla pagina Releases (asset *Source code*), scompatta lo zip e prosegui con la prima installazione.
+
+Oppure scarica e prepara tutto con un unico comando:
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/filippocasini98/label-anything/main/install.sh | bash
+```
+
+**Windows:** scarica [`install.bat`](https://github.com/filippocasini98/label-anything/raw/main/install.bat) ed eseguilo con doppio clic.
+
 ## Prima installazione (una volta sola)
 
 Doppio clic su `setup.command` (macOS) o `setup.bat` (Windows): crea l'ambiente virtuale e installa PySide6, OpenCV e numpy.
