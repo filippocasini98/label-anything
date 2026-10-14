@@ -39,7 +39,7 @@ jobs:
           precedente: ${{ steps.versione.outputs.precedente }}
 
       - name: Pacchetto Source-code.zip
-        run: git archive --format=zip -o Source-code.zip "${{ steps.versione.outputs.prossima }}"
+        run: git archive --format=zip -o Source-code.zip HEAD  # il tag esiste solo dallo step successivo
 
       - name: Crea tag e release
         env:
