@@ -751,7 +751,18 @@ class FinestraPrincipale(QMainWindow):
         self.viewer.mostra_annotazioni(self._record_corrente())
 
     def _classe_cambiata(self) -> None:
-        self.viewer.set_classe_attiva(self.combo_classe.currentText())
+        nome = self.combo_classe.currentText()
+        self.viewer.set_classe_attiva(nome)
+        # un box selezionato cambia etichetta quando si sceglie un'altra classe
+        indice_box = self.viewer.indice_selezionato()
+        if indice_box >= 0:
+            record = self._record_corrente()
+            nuovo = record.copia()
+            if 0 <= indice_box < len(nuovo.geometrie) and nuovo.geometrie[indice_box].get("tipo") == "box":
+                nuovo.geometrie[indice_box]["classe"] = nome
+                self._modifica_record(nuovo)
+                self.viewer.mostra_annotazioni(nuovo)
+                self._programma_salvataggio()
 
     # ------------------------------------------------------------ salvataggio
 
