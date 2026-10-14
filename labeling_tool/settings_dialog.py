@@ -28,6 +28,7 @@ from labeling_tool.config import ESTENSIONI_DEFAULT, ProgettoConfig, EtichettaDe
 WORKFLOW_VOCI = {
     "classificazione": "Solo classificazione (etichette per immagine)",
     "classificazione+geometrie": "Classificazione + geometrie (box e poligoni)",
+    "geometrie": "Solo geometrie (box e poligoni, nessuna classificazione immagine)",
 }
 
 

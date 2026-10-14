@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 _RE_COLORE = re.compile(r"^#[0-9A-Fa-f]{6}$")
-WORKFLOW_VALIDI = ("classificazione", "classificazione+geometrie")
+WORKFLOW_VALIDI = ("classificazione", "classificazione+geometrie", "geometrie")
 ESTENSIONI_DEFAULT = [".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"]
 
 
@@ -68,8 +68,8 @@ class ProgettoConfig:
         for e in self.etichette:
             if not _RE_COLORE.match(e.colore):
                 errori.append(f"Colore non valido per '{e.nome}': {e.colore!r} (atteso #RRGGBB).")
-        if self.workflow == "classificazione+geometrie" and not self.etichette:
-            errori.append("Servono almeno 2 etichette nel workflow con geometrie.")
+        if self.workflow in ("classificazione+geometrie", "geometrie") and not self.etichette:
+            errori.append("Servono almeno 2 etichette nei workflow con geometrie.")
         if self.scala_px_per_unita <= 0:
             errori.append("La scala px/unita' deve essere maggiore di zero.")
         return errori

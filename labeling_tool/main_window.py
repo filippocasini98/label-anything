@@ -134,10 +134,16 @@ class FinestraPrincipale(QMainWindow):
         finestra.salva()
         return finestra
 
+    def _record_completato(self, record: Record) -> bool:
+        """Un'immagine e' completata con le geometrie o con le etichette, a seconda del workflow."""
+        if self.progetto.config.workflow == "geometrie":
+            return bool(record.geometrie)
+        return bool(record.etichette)
+
     def _prima_da_completare(self) -> int:
         for i, percorso in enumerate(self.immagini):
             record = self.progetto.immagini[percorso.name]
-            if not record.etichette and not record.da_revisionare:
+            if not self._record_completato(record) and not record.da_revisionare:
                 return i
         return 0
 
@@ -194,9 +200,12 @@ class FinestraPrincipale(QMainWindow):
         side = QVBoxLayout(pannello)
         side.setSpacing(8)
 
-        side.addWidget(self._sezione("ETICHETTE"))
-        self.pannello_etichette = QVBoxLayout()
-        side.addLayout(self.pannello_etichette)
+        self.sezione_etichette = self._sezione("ETICHETTE")
+        side.addWidget(self.sezione_etichette)
+        self.contenitore_etichette = QWidget()
+        self.pannello_etichette = QVBoxLayout(self.contenitore_etichette)
+        self.pannello_etichette.setContentsMargins(0, 0, 0, 0)
+        side.addWidget(self.contenitore_etichette)
 
         self.check_revisione = QCheckBox("Da revisionare [X]")
         self.check_revisione.stateChanged.connect(self._toggle_revisionare)
@@ -317,7 +326,7 @@ class FinestraPrincipale(QMainWindow):
         self.combo_strumenti.addItem("Naviga (pan)", "nav")
         self.combo_strumenti.addItem("Seleziona/modifica", "seleziona")
         self._strumenti_geometrici = []
-        if self.progetto.config.workflow == "classificazione+geometrie":
+        if self.progetto.config.workflow in ("classificazione+geometrie", "geometrie"):
             self.combo_strumenti.addItem("Disegna box", "box")
             self.combo_strumenti.addItem("Disegna poligono", "poligono")
             self._strumenti_geometrici += ["box", "poligono"]
@@ -335,6 +344,9 @@ class FinestraPrincipale(QMainWindow):
         self.combo_strumenti.blockSignals(False)
 
     def _popola_etichette(self) -> None:
+        solo_geometrie = self.progetto.config.workflow == "geometrie"
+        self.sezione_etichette.setVisible(not solo_geometrie)
+        self.contenitore_etichette.setVisible(not solo_geometrie)
         while self.pannello_etichette.count():
             item = self.pannello_etichette.takeAt(0)
             widget = item.widget()
@@ -473,6 +485,10 @@ class FinestraPrincipale(QMainWindow):
     def _colore_record(self, record: Record) -> str:
         if record.da_revisionare:
             return COLORE_REVISIONE
+        if self.progetto.config.workflow == "geometrie":
+            if record.geometrie:
+                return self.progetto.config.colore_di(record.geometrie[0].get("classe", ""))
+            return COLORE_NON_ASSEGNATA
         if record.etichette:
             return self.progetto.config.colore_di(record.etichette[0])
         return COLORE_NON_ASSEGNATA
@@ -499,7 +515,10 @@ class FinestraPrincipale(QMainWindow):
         self.viewer.mostra_annotazioni(record)
 
         self.titolo.setText(f"{indice + 1}/{len(self.immagini)} — {percorso.name}")
-        badge = " • ".join(record.etichette).upper() if record.etichette else "NON ETICHETTATA"
+        if self.progetto.config.workflow == "geometrie":
+            badge = f"{len(record.geometrie)} OGGETTI" if record.geometrie else "NON ETICHETTATA"
+        else:
+            badge = " • ".join(record.etichette).upper() if record.etichette else "NON ETICHETTATA"
         if record.da_revisionare:
             badge += " • DA REVISIONARE"
         if record.revisionata:
@@ -544,7 +563,7 @@ class FinestraPrincipale(QMainWindow):
 
     def _aggiorna_progresso(self) -> None:
         completate = sum(
-            bool(self.progetto.immagini[p.name].etichette) for p in self.immagini
+            self._record_completato(self.progetto.immagini[p.name]) for p in self.immagini
         )
         self.progresso.setMaximum(len(self.immagini))
         self.progresso.setValue(completate)
@@ -831,7 +850,7 @@ class FinestraPrincipale(QMainWindow):
             r = self.progetto.immagini[percorso.name]
             ok = (
                 testo == "Tutte"
-                or (testo == "Non etichettate" and not r.etichette)
+                or (testo == "Non etichettate" and not self._record_completato(r))
                 or (testo == "Da revisionare" and r.da_revisionare)
                 or (testo == "Revisionate" and r.revisionata)
                 or (testo == "Con note" and bool(r.note))
@@ -865,7 +884,7 @@ class FinestraPrincipale(QMainWindow):
     def _successiva_preferendo_da_fare(self) -> None:
         for i in range(self.indice + 1, len(self.immagini)):
             r = self.progetto.immagini[self.immagini[i].name]
-            if not r.etichette and not r.da_revisionare:
+            if not self._record_completato(r) and not r.da_revisionare:
                 self.mostra_indice(i)
                 return
         self.successiva()
@@ -874,7 +893,7 @@ class FinestraPrincipale(QMainWindow):
         for offset in range(1, len(self.immagini) + 1):
             i = (self.indice + offset) % len(self.immagini)
             r = self.progetto.immagini[self.immagini[i].name]
-            if not r.etichette:
+            if not self._record_completato(r):
                 self.mostra_indice(i)
                 return
         self.stato_label.setText("Tutte le immagini sono etichettate")
