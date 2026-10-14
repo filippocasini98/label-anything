@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Progetti di etichettatura e dati locali
+*.progetto.json
+*.corrotto
+*.csv
+
+# Export
+statistiche_esportate/
