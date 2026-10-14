@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
@@ -225,6 +225,14 @@ class ImageViewer(QGraphicsView):
         self.zoom_by(1.20 if event.angleDelta().y() > 0 else 1 / 1.20)
 
     def mouseDoubleClickEvent(self, event) -> None:
+        if self._strumento == "poligono" and self._punti_correnti:
+            self._chiudi_poligono()
+            event.accept()
+            return
+        if self._strumento == "area" and self._punti_correnti:
+            self._chiudi_area()
+            event.accept()
+            return
         self.reset_view()
         super().mouseDoubleClickEvent(event)
 
@@ -565,6 +573,23 @@ class ImageViewer(QGraphicsView):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def event(self, e) -> bool:
+        # Mentre si disegna, Invio/Esc appartengono al disegno: senza questo
+        # reclamo le scorciatoie globali della finestra se li rubano.
+        if e.type() == QEvent.ShortcutOverride and self._disegno_in_corso():
+            if e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
+                e.accept()
+                return True
+        return super().event(e)
+
+    def _disegno_in_corso(self) -> bool:
+        return bool(
+            self._punti_correnti
+            or self._anteprima_box is not None
+            or self._distanza_p1 is not None
+            or self._temporanei
+        )
 
     def keyPressEvent(self, event) -> None:
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):

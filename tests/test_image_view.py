@@ -4,6 +4,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+import numpy as np
+
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtWidgets import QApplication
 
@@ -63,3 +65,80 @@ def test_croce_schermo_traccia_il_mouse_e_sparendo_alluscita(qapp):
     assert viewer._pos_mouse is not None
     viewer.leaveEvent(QEvent(QEvent.Type.Leave))
     assert viewer._pos_mouse is None
+
+
+def _viewer_con_immagine() -> ImageViewer:
+    viewer = ImageViewer()
+    viewer.set_image(np.zeros((64, 64, 3), dtype=np.uint8), "#E74C3C")
+    return viewer
+
+
+def _click(viewer, x, y):
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent as QE
+    ev_p = QMouseEvent(QE.MouseButtonPress, QPointF(x, y), QPointF(x, y),
+                       Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    ev_r = QMouseEvent(QE.MouseButtonRelease, QPointF(x, y), QPointF(x, y),
+                       Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    viewer.mousePressEvent(ev_p)
+    viewer.mouseReleaseEvent(ev_r)
+
+
+def test_invio_chiude_il_poligono(qapp):
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("poligono")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    for x, y in ((10, 10), (40, 10), (40, 30)):
+        _click(viewer, x, y)
+    assert not aggiunte
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent as QE
+    viewer.keyPressEvent(QKeyEvent(QE.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier))
+    assert len(aggiunte) == 1
+    assert aggiunte[0]["tipo"] == "poligono"
+    assert len(aggiunte[0]["punti"]) == 3
+    assert viewer._punti_correnti == []
+
+
+def test_doppio_clic_chiude_il_poligono(qapp):
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("poligono")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    for x, y in ((10, 10), (40, 10), (40, 30)):
+        _click(viewer, x, y)
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent as QE
+    ev = QMouseEvent(QE.MouseButtonDblClick, QPointF(10, 10), QPointF(10, 10),
+                     Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    _click(viewer, 10, 10)  # il primo clic del doppio clic: aggiunge l'ultimo vertice
+    viewer.mouseDoubleClickEvent(ev)
+    assert len(aggiunte) == 1
+    assert len(aggiunte[0]["punti"]) == 4
+    assert viewer._punti_correnti == []
+
+
+def test_doppio_clic_fuori_disegno_fa_reset_zoom(qapp):
+    viewer = ImageViewer()
+    viewer.set_strumento("poligono")
+    viewer.zoom_by(2.0)
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent as QE
+    ev = QMouseEvent(QE.MouseButtonDblClick, QPointF(10, 10), QPointF(10, 10),
+                     Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    viewer.mouseDoubleClickEvent(ev)
+    assert viewer._zoom == 1.0
+
+
+def test_shortcut_override_reclama_invio_solo_durante_il_disegno(qapp):
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent as QE
+
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("poligono")
+    tasto = QKeyEvent(QE.ShortcutOverride, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+    assert viewer.event(tasto) is False  # niente disegno in corso: la scorciatoia globale resta libera
+    _click(viewer, 10, 10)
+    tasto = QKeyEvent(QE.ShortcutOverride, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+    assert viewer.event(tasto) is True   # disegno in corso: Invio va al poligono
