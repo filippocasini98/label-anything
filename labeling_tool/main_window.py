@@ -239,10 +239,14 @@ class FinestraPrincipale(QMainWindow):
         eff = QHBoxLayout()
         self.check_grigi = QCheckBox("Grigi [G]")
         self.check_equalizza = QCheckBox("Equalizza [H]")
+        self.check_dimensioni = QCheckBox("Dimensioni box")
+        self.check_dimensioni.setChecked(True)
+        self.check_dimensioni.toggled.connect(self._dimensioni_cambiate)
         self.check_grigi.stateChanged.connect(self._visualizzazione_modificata)
         self.check_equalizza.stateChanged.connect(self._visualizzazione_modificata)
         eff.addWidget(self.check_grigi)
         eff.addWidget(self.check_equalizza)
+        eff.addWidget(self.check_dimensioni)
         side.addWidget(QLabel("Luminosità"))
         side.addWidget(self.slider_luminosita)
         side.addWidget(QLabel("Contrasto"))
@@ -741,6 +745,10 @@ class FinestraPrincipale(QMainWindow):
             self.stato_label.setText(
                 "Puntatore applicato agli strumenti di disegno: scegline uno (es. Disegna box) per vederlo"
             )
+
+    def _dimensioni_cambiate(self) -> None:
+        self.viewer.set_mostra_dimensioni(self.check_dimensioni.isChecked())
+        self.viewer.mostra_annotazioni(self._record_corrente())
 
     def _classe_cambiata(self) -> None:
         self.viewer.set_classe_attiva(self.combo_classe.currentText())

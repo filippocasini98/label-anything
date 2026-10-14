@@ -190,6 +190,7 @@ class ImageViewer(QGraphicsView):
         self._colori: dict = {}
         self._unita = "px"
         self._scala = 1.0
+        self._mostra_dimensioni = True
         self._boxes: List[BoxItem] = []
         self._altri_items: List[QGraphicsItem] = []
         self._temporanei: List[QGraphicsItem] = []
@@ -274,6 +275,10 @@ class ImageViewer(QGraphicsView):
     def set_colori(self, colori: dict) -> None:
         self._colori = dict(colori)
 
+    def set_mostra_dimensioni(self, attivo: bool) -> None:
+        """Mostra/nasconde le dimensioni sopra box e poligoni."""
+        self._mostra_dimensioni = bool(attivo)
+
     # ---------------- annotazioni ----------------
 
     def _colore_classe(self, nome: str) -> str:
@@ -307,8 +312,11 @@ class ImageViewer(QGraphicsView):
                 )
                 self.scene().addItem(item)
                 self._boxes.append(item)
-                testo_box = f"{classe}  {self._testo_dimensioni_box(g['w'], g['h'])}"
-                self._testo_etichetta(testo_box, QPointF(g["x"], max(0.0, g["y"] - 18)), colore)
+                if self._mostra_dimensioni:
+                    self._testo_etichetta(
+                        self._testo_dimensioni_box(g["w"], g["h"]),
+                        QPointF(g["x"], max(0.0, g["y"] - 18)), colore,
+                    )
             elif g.get("tipo") == "poligono":
                 item = QGraphicsPolygonItem(QPolygonF([QPointF(*p) for p in g["punti"]]))
                 qcolore = QColor(colore)
@@ -317,10 +325,9 @@ class ImageViewer(QGraphicsView):
                 item.setOpacity(0.45)
                 self.scene().addItem(item)
                 self._altri_items.append(item)
-                if g["punti"]:
-                    testo_poligono = f"{classe}  {self._testo_dimensioni_poligono(g['punti'])}"
+                if g["punti"] and self._mostra_dimensioni:
                     self._testo_etichetta(
-                        testo_poligono,
+                        self._testo_dimensioni_poligono(g["punti"]),
                         QPointF(g["punti"][0][0], max(0.0, g["punti"][0][1] - 18)),
                         colore,
                     )
@@ -408,27 +415,15 @@ class ImageViewer(QGraphicsView):
         return f"{larghezza:.1f}x{altezza:.1f}px A: {area_px:.0f}px2"
 
     def _testo_dimensioni_box(self, larghezza: float, altezza: float) -> str:
-        """Grandezza di un bounding box: px e, se configurata, l'unita' reale."""
-        if self._unita and self._unita != "px":
-            return (
-                f"{larghezza:.0f}x{altezza:.0f}px "
-                f"({larghezza / self._scala:.2f}x{altezza / self._scala:.2f} {self._unita})"
-            )
-        return f"{larghezza:.0f}x{altezza:.0f}px"
+        """Grandezza di un bounding box in pixel: solo i numeri."""
+        return f"{larghezza:.0f}x{altezza:.0f}"
 
     def _testo_dimensioni_poligono(self, punti) -> str:
-        """Grandezza di un poligono: bounding box e area, in px e nell'unita' reale."""
-        from labeling_tool.model import area_poligono, dimensioni_bbox_poligono
+        """Bounding box del poligono in pixel: solo i numeri."""
+        from labeling_tool.model import dimensioni_bbox_poligono
 
         larghezza, altezza = dimensioni_bbox_poligono(punti)
-        area_px = area_poligono(punti)
-        if self._unita and self._unita != "px":
-            return (
-                f"{larghezza:.0f}x{altezza:.0f}px "
-                f"({larghezza / self._scala:.2f}x{altezza / self._scala:.2f} {self._unita}) "
-                f"A: {area_px / self._scala ** 2:.2f} {self._unita}2"
-            )
-        return f"{larghezza:.0f}x{altezza:.0f}px A: {area_px:.0f}px2"
+        return f"{larghezza:.0f}x{altezza:.0f}"
 
     # ---------------- callback item ----------------
 
