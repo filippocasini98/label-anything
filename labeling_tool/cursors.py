@@ -102,3 +102,23 @@ def cursore_valido(nome: Optional[str]) -> str:
 
 def crea_cursore(nome: Optional[str]) -> QCursor:
     return CURSORI[cursore_valido(nome)].factory()
+
+
+def leggi_cursore(percorso: Optional[Path] = None) -> str:
+    """Cursore salvato dall'utente; default se assente o non valido."""
+    percorso = percorso or PERCORSO_CURSORE
+    try:
+        testo = percorso.read_text(encoding="utf-8").strip()
+    except (OSError, ValueError):
+        return CURSORE_DEFAULT
+    return cursore_valido(testo)
+
+
+def salva_cursore(nome: str, percorso: Optional[Path] = None) -> None:
+    """Scrive il nome normalizzato; errori di I/O ignorati."""
+    percorso = percorso or PERCORSO_CURSORE
+    try:
+        percorso.parent.mkdir(parents=True, exist_ok=True)
+        percorso.write_text(cursore_valido(nome), encoding="utf-8")
+    except OSError:
+        pass

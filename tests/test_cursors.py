@@ -61,3 +61,25 @@ def test_factory_cursori_custom(qapp, nome):
     assert pm.devicePixelRatio() == 2.0   # logico 24x24
     hotspot = cursore.hotSpot()
     assert hotspot == QPoint(LATO_LOGICO // 2, LATO_LOGICO // 2)
+
+
+def test_persistenza_round_trip(tmp_path):
+    from labeling_tool.cursors import leggi_cursore, salva_cursore
+
+    percorso = tmp_path / "sotto" / "cursore.txt"
+    assert leggi_cursore(percorso) == CURSORE_DEFAULT  # file assente -> default
+    salva_cursore("target", percorso)
+    assert leggi_cursore(percorso) == "target"
+    assert percorso.parent.exists()  # le directory vengono create
+
+
+def test_persistenza_normalizza_e_resiste_a_garbage(tmp_path):
+    from labeling_tool.cursors import leggi_cursore, salva_cursore
+
+    percorso = tmp_path / "cursore.txt"
+    salva_cursore("pippo", percorso)          # nome non valido: salvato il default
+    assert leggi_cursore(percorso) == CURSORE_DEFAULT
+    percorso.write_text("robaccia\n", encoding="utf-8")
+    assert leggi_cursore(percorso) == CURSORE_DEFAULT
+    percorso.write_bytes(b"\x80\x81\xff")
+    assert leggi_cursore(percorso) == CURSORE_DEFAULT
