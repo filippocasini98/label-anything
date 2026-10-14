@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from labeling_tool.config import ProgettoConfig
+from labeling_tool.cursors import CURSORI, leggi_cursore, salva_cursore
 from labeling_tool.export import (
     esporta_coco,
     esporta_csv,
@@ -358,6 +359,17 @@ class FinestraPrincipale(QMainWindow):
         aggiungi("Prossima da etichettare", "N", self.prossima_da_etichettare)
 
         toolbar.addWidget(self._bottone_export())
+
+        self.combo_cursore = QComboBox()
+        self.combo_cursore.setToolTip("Puntatore per gli strumenti di disegno")
+        for definizione in CURSORI.values():
+            self.combo_cursore.addItem(definizione.etichetta, definizione.nome)
+        nome_cursore = leggi_cursore()
+        indice = self.combo_cursore.findData(nome_cursore)
+        self.combo_cursore.setCurrentIndex(max(indice, 0))
+        self.combo_cursore.currentIndexChanged.connect(self._cursore_cambiato)
+        toolbar.addWidget(self.combo_cursore)
+        self.viewer.set_cursore(nome_cursore)
 
         for e in self.progetto.config.etichette:
             if e.tasto:
@@ -704,6 +716,11 @@ class FinestraPrincipale(QMainWindow):
 
     def _strumento_cambiato(self) -> None:
         self.viewer.set_strumento(self.combo_strumenti.currentData())
+
+    def _cursore_cambiato(self) -> None:
+        nome = self.combo_cursore.currentData()
+        self.viewer.set_cursore(nome)
+        salva_cursore(nome)
 
     def _classe_cambiata(self) -> None:
         self.viewer.set_classe_attiva(self.combo_classe.currentText())
