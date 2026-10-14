@@ -1,16 +1,16 @@
 # Label Anything
 
-Strumento desktop (PySide6 + OpenCV) per etichettare, annotare e analizzare qualsiasi tipo di immagine. Interamente configurabile da GUI: nessun file di configurazione da editare a mano.
+Desktop tool (PySide6 + OpenCV) to label, annotate and analyze any kind of image. Fully configurable from the GUI: no config file to edit by hand.
 
-## Requisiti
+## Requirements
 
-Python 3.9 o superiore (macOS, Windows o Linux). Tutto il resto viene installato automaticamente.
+Python 3.9 or newer (macOS, Windows or Linux). Everything else is installed automatically.
 
-## Scarica
+## Download
 
-**[⬇️ Scarica l'ultima versione](https://github.com/filippocasini98/label-anything/releases/latest)** dalla pagina Releases (asset *Source code*), scompatta lo zip e prosegui con la prima installazione.
+**[⬇️ Download the latest release](https://github.com/filippocasini98/label-anything/releases/latest)** from the Releases page (*Source code* asset), unzip it and continue with the first-time setup.
 
-Oppure scarica e prepara tutto con un unico comando:
+Or download and set everything up with a single command:
 
 **macOS / Linux:**
 
@@ -18,90 +18,90 @@ Oppure scarica e prepara tutto con un unico comando:
 curl -fsSL https://raw.githubusercontent.com/filippocasini98/label-anything/main/install.sh | bash
 ```
 
-**Windows:** scarica [`install.bat`](https://github.com/filippocasini98/label-anything/raw/main/install.bat) ed eseguilo con doppio clic.
+**Windows:** download [`install.bat`](https://github.com/filippocasini98/label-anything/raw/main/install.bat) and double-click it.
 
-## Prima installazione (una volta sola)
+## First-time setup (once)
 
-Doppio clic su `setup.command` (macOS) o `setup.bat` (Windows): crea l'ambiente virtuale e installa PySide6, OpenCV e numpy.
+Double-click `setup.command` (macOS) or `setup.bat` (Windows): it creates the virtual environment and installs PySide6, OpenCV and numpy.
 
-## Avvio
+## Running
 
-Doppio clic su `start.command` (macOS) o `start.bat` (Windows), oppure:
+Double-click `start.command` (macOS) or `start.bat` (Windows), or:
 
 ```bash
 ./venv/bin/python run_labeling.py
 ```
 
-Il programma **ricorda l'ultima cartella aperta** e riparte direttamente da lì: il selettore di cartelle appare solo al primo avvio (o con `Ctrl+O` per cambiare cartella). Puoi anche passare la cartella da riga di comando: `python run_labeling.py /percorso/cartella`.
+The program **remembers the last opened folder** and restarts right from there: the folder picker only appears on first launch (or with `Ctrl+O` to change folder). You can also pass the folder on the command line: `python run_labeling.py /path/to/folder`.
 
-Al primo avvio in una cartella: seleziona la cartella immagini, il wizard crea il progetto (`nome.progetto.json` dentro la cartella). Riaprendo la cartella il progetto viene caricato automaticamente.
+On first launch in a folder: select the images folder, the wizard creates the project (`nome.progetto.json` inside the folder). Reopening the folder loads the project automatically.
 
-### Applicazione macOS a doppio clic (facoltativo)
+### Double-clickable macOS app (optional)
 
-Per un lancio senza terminale puoi creare un bundle `Label Anything.app`:
+For a terminal-free launch you can create a `Label Anything.app` bundle:
 
 ```bash
 mkdir -p "Label Anything.app/Contents/MacOS"
 cat > "Label Anything.app/Contents/MacOS/LabelAnything" <<'SH'
 #!/bin/bash
-exec "/percorso/del/progetto/venv/bin/python" "/percorso/del/progetto/run_labeling.py" "$@"
+exec "/path/to/project/venv/bin/python" "/path/to/project/run_labeling.py" "$@"
 SH
 chmod +x "Label Anything.app/Contents/MacOS/LabelAnything"
 ```
 
-con un `Contents/Info.plist` che punti a `CFBundleExecutable` `LabelAnything` (vedi la struttura standard dei bundle macOS).
+with a `Contents/Info.plist` pointing `CFBundleExecutable` to `LabelAnything` (see the standard macOS bundle structure).
 
-## Funzioni
+## Features
 
-- **Classificazione**: etichette con tasti scorciatoia configurabili; modalità mono-label (auto-avanzamento dopo l'assegnazione) o multi-label (toggle).
-- **Geometrie** (workflow "classificazione + geometrie" oppure "solo geometrie"): bounding box trascinate sullo schermo, ridimensionabili con 8 maniglie e spostabili; poligoni a clic, chiusi con Invio. Classe per oggetto selezionabile. La **grandezza di ogni geometria** è mostrata sull'immagine, riportata in `etichette.csv` e aggregata per classe in `statistiche.csv`: per i box larghezza/altezza/area, per i poligoni bounding box e area (media, minimo, massimo, in px o nell'unità configurata).
-- **Misure** (se abilitate): distanza tra due clic (px e unità configurabile via scala px/unità), area di poligono, conteggio oggetti a clic, **dimensioni di oggetti** (rettangolo trascinato: larghezza, altezza e area in px e nell'unità configurata - utile ad es. per misurare stomi in immagini al microscopio elettronico). Tutte le misure sono salvate e rimostrate.
-- **Analisi visiva**: luminosità, contrasto, scala di grigi, equalizzazione CLAHE, zoom/pan.
-- **Statistiche**: distribuzione etichette, progresso, revisioni, conteggio geometrie e misure; esportabili in CSV.
-- **Filtri**: per stato (non etichettate, da revisionare, revisionate, con note, con geometrie) e per etichetta.
-- **Undo/redo** su ogni modifica, autosave atomico a 350 ms e su chiusura.
-- **Workflow "Solo geometrie"**: disegno di box e poligoni senza classificazione dell'immagine; la sezione etichette si nasconde e un'immagine è completata quando ha geometrie. Le etichette restano obblatorie perché sono le classi degli oggetti.
-- **Selettore del puntatore**: 8 cursori per gli strumenti di disegno e misura (crosshair, croce a tutto schermo, precision, annotation, target, punto, freccia, invisibile), selezionabili al volo da un combobox in toolbar e salvati come preferenza globale.
+- **Classification**: labels with configurable shortcut keys; single-label mode (auto-advance after assignment) or multi-label mode (toggle).
+- **Geometries** ("classification + geometries" or "geometries only" workflow): bounding boxes dragged on screen, resizable with 8 handles and movable; click-to-draw polygons, closed with Enter. Per-object class is selectable. The **size of every geometry** is shown on the image, reported in `etichette.csv` and aggregated per class in `statistiche.csv`: for boxes width/height/area, for polygons bounding box and area (mean, min, max, in px or in the configured unit).
+- **Measurements** (if enabled): distance between two clicks (px and configured unit via px/unit scale), polygon area, click object counting, **object dimensions** (dragged rectangle: width, height and area in px and in the configured unit — useful e.g. to measure stomata in electron microscope images). All measurements are saved and re-displayed.
+- **Visual analysis**: brightness, contrast, grayscale, CLAHE equalization, zoom/pan.
+- **Statistics**: label distribution, progress, reviews, geometry and measurement counts; exportable to CSV.
+- **Filters**: by status (unlabeled, to review, reviewed, with notes, with geometries) and by label.
+- **Undo/redo** on every change, atomic autosave at 350 ms and on close.
+- **"Geometries only" workflow**: draw boxes and polygons without image classification; the labels section is hidden and an image counts as completed once it has geometries. Labels remain mandatory because they are the object classes.
+- **Pointer selector**: 8 cursors for drawing and measurement tools (crosshair, full-screen cross, precision, annotation, target, dot, arrow, invisible), selectable on the fly from a toolbar combobox and saved as a global preference.
 
-## Scorciatoie
+## Shortcuts
 
-- `Ctrl+O` apri cartella, `Ctrl+S` salva, `Ctrl+Z`/`Ctrl+Y` annulla/ripristina
-- `Ctrl+E` configurazione, `N` prossima da etichettare
-- Tasti `1..9` (configurabili): assegna/toggle etichetta
-- `A`/`D` precedente/successiva, `X` da revisionare, `Invio` conferma revisione
-- `G` grigi, `H` equalizza, `R` ripristina visualizzazione, `+`/`-` zoom
-- `Invio` chiude poligono/area, `Esc` annulla disegno, `Delete` elimina geometria/misura selezionata (o le etichette)
-- Il poligono/area si chiude anche con un clic sul primo vertice oppure con doppio clic; il combo etichette cambia la classe del box selezionato
+- `Ctrl+O` open folder, `Ctrl+S` save, `Ctrl+Z`/`Ctrl+Y` undo/redo
+- `Ctrl+E` configuration, `N` next image to label
+- Keys `1..9` (configurable): assign/toggle label
+- `A`/`D` previous/next, `X` mark for review, `Enter` confirm review
+- `G` grayscale, `H` equalize, `R` reset view, `+`/`-` zoom
+- `Enter` closes polygon/area, `Esc` cancels drawing, `Delete` deletes the selected geometry/measurement (or the labels)
+- Polygon/area can also be closed by clicking the first vertex or double-clicking; the label combobox changes the class of the selected box
 
-## Dati ed export
+## Data and export
 
-I dati stanno in una **cartella dati dedicata**:
+Data lives in a **dedicated data folder**:
 
-- cartella con più immagini → sottocartella `etichettatura/` dentro la cartella immagini
-- immagine singola → accanto all'immagine, senza sottocartella
+- folder with multiple images → `etichettatura/` subfolder inside the images folder
+- single image → next to the image, no subfolder
 
-Dentro la cartella dati:
+Inside the data folder:
 
-- `nome.progetto.json` — il progetto: configurazione + annotazioni + misure. Salvataggio atomico; se corrotto viene messo da parte come `.corrotto` e il progetto riparte. I progetti creati con versioni precedenti (nella radice) vengono migrati automaticamente.
-- `etichette.csv` — aggiornato a ogni salvataggio: una riga per immagine con nome, numero di etichette, etichette, stato, note, conteggi di geometrie e misure.
-- `statistiche.csv` — aggiornato a ogni salvataggio: distribuzione etichette, stati, progresso e statistiche degli oggetti misurati (numero, larghezza/altezza/area media, minimo e massimo, in px o nell'unità configurata).
+- `nome.progetto.json` — the project: configuration + annotations + measurements. Atomic saving; if corrupted it is set aside as `.corrotto` and the project restarts. Projects created with earlier versions (in the root) are migrated automatically.
+- `etichette.csv` — updated on every save: one row per image with name, number of labels, labels, status, notes, geometry and measurement counts.
+- `statistiche.csv` — updated on every save: label distribution, statuses, progress and statistics of measured objects (count, mean/min/max width/height/area, in px or in the configured unit).
 
-Export aggiuntivi dal menu "Export": COCO detection/segmentation, YOLO detection/segmentation, LabelMe, maschere PNG indicizzate (con `legend.csv`), CSV e report statistiche in una cartella a scelta.
+Additional exports from the "Export" menu: COCO detection/segmentation, YOLO detection/segmentation, LabelMe, indexed PNG masks (with `legend.csv`), CSV and statistics report to a folder of your choice.
 
-## Sviluppo
+## Development
 
 ```bash
-./venv/bin/python -m pytest        # test logica pura (config, model, io, export)
+./venv/bin/python -m pytest        # pure-logic tests (config, model, io, export)
 ```
 
-Struttura: `labeling_tool/` — `config.py` (schema e validazione), `model.py` (record, progetto, undo/redo, calcoli), `io_utils.py` (scansione e cache), `export.py` (formati, funzioni pure), `cursors.py` (cursori di annotazione), `image_view.py` (viewer annotazioni), `settings_dialog.py` (wizard ed editor), `main_window.py` (UI principale).
+Structure: `labeling_tool/` — `config.py` (schema and validation), `model.py` (records, project, undo/redo, calculations), `io_utils.py` (scanning and cache), `export.py` (formats, pure functions), `cursors.py` (annotation cursors), `image_view.py` (annotation viewer), `settings_dialog.py` (wizard and editor), `main_window.py` (main UI).
 
-Ogni merge in `main` produce automaticamente una release (tag con bump della minor e `Source-code.zip` allegato) tramite GitHub Actions (`.github/workflows/release.yml`).
+Every merge to `main` automatically produces a release (tag with bumped minor version and an attached `Source-code.zip`) via GitHub Actions (`.github/workflows/release.yml`).
 
-## Condividere il programma
+## Sharing the program
 
-La cartella del programma è autonoma: basta copiarla o zipparla (senza `venv/`, `__pycache__/` e i progetti di etichettatura `*.progetto.json`). Chi la riceve esegue `setup` una volta e poi `start`. I dati di etichettatura restano sempre nella cartella immagini dell'utente, non dentro il programma.
+The program folder is self-contained: just copy or zip it (without `venv/`, `__pycache__/` and the `*.progetto.json` labeling projects). Whoever receives it runs `setup` once and then `start`. Labeling data always stays in the user's images folder, never inside the program.
 
-## Licenza
+## License
 
-Distribuito sotto licenza MIT: vedi il file `LICENSE`.
+Distributed under the MIT license: see the `LICENSE` file.
