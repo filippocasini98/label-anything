@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from labeling_tool.config import ProgettoConfig
+from labeling_tool.config import ProgettoConfig, versione_app
 from labeling_tool.cursors import CURSORI, leggi_cursore, salva_cursore
 from labeling_tool.export import (
     esporta_coco,
@@ -96,7 +96,7 @@ class FinestraPrincipale(QMainWindow):
         self.salvato = True
         self._caricamento_ui = False
 
-        self.setWindowTitle(f"Label Anything - {config.nome_progetto}")
+        self.setWindowTitle(f"Label Anything {versione_app()} - {config.nome_progetto}")
         self.resize(1600, 1000)
         self.setMinimumSize(1100, 720)
         self._costruisci_ui()
@@ -925,7 +925,7 @@ class FinestraPrincipale(QMainWindow):
         self._popola_etichette()
         self._popola_filtri()
         self._popola_strumenti()
-        self.setWindowTitle(f"Label Anything - {self.progetto.config.nome_progetto}")
+        self.setWindowTitle(f"Label Anything {versione_app()} - {self.progetto.config.nome_progetto}")
         self.indice = min(self.indice, max(0, len(self.immagini) - 1))
         self.salva()
         self.mostra_indice(self.indice)

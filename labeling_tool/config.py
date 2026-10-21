@@ -1,10 +1,16 @@
 """Schema della configurazione del progetto: caricamento, salvataggio, validazione."""
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import List
 
 _RE_COLORE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def versione_app() -> str:
+    """Versione dell'applicazione: 'dev' in sviluppo, il tag della release nella build."""
+    return os.environ.get("APP_VERSION", "dev")
 WORKFLOW_VALIDI = ("classificazione", "classificazione+geometrie", "geometrie")
 ESTENSIONI_DEFAULT = [".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"]
 
