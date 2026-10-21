@@ -84,11 +84,21 @@ class BoxItem(QGraphicsItem):
         }
 
     def _maniglia_sotto(self, pos: QPointF) -> Optional[str]:
-        soglia = MANIGLIA * 1.5
+        """Maniglia più vicina al punto entro la soglia, se il punto non è
+        nell'area interna del box (dove comanda lo spostamento)."""
+        interno = self._rect.adjusted(MANIGLIA, MANIGLIA, -MANIGLIA, -MANIGLIA)
+        if not interno.isEmpty() and interno.contains(pos):
+            return None
+        # box piccolo: soglia ridotta, altrimenti ogni punto interno è di una maniglia
+        soglia = MANIGLIA if interno.isEmpty() else MANIGLIA * 1.5
+        migliore: Optional[str] = None
+        distanza_min = soglia
         for nome, centro in self._maniglie().items():
-            if (pos - centro).manhattanLength() <= soglia:
-                return nome
-        return None
+            distanza = (pos - centro).manhattanLength()
+            if distanza < distanza_min:
+                migliore = nome
+                distanza_min = distanza
+        return migliore
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         pen = QPen(self.colore, 2)
@@ -107,9 +117,12 @@ class BoxItem(QGraphicsItem):
 
     def mousePressEvent(self, event) -> None:
         pos = event.pos()
-        if not self.selezionato and self.on_selezione:
+        gia_selezionato = self.selezionato
+        if not gia_selezionato and self.on_selezione:
             self.on_selezione(self.indice)
-        maniglia = self._maniglia_sotto(pos) if self.selezionato else None
+        # le maniglie si agganciano solo se il box era già selezionato:
+        # altrimenti il primo clic (che seleziona) partirebbe in resize
+        maniglia = self._maniglia_sotto(pos) if gia_selezionato else None
         if maniglia:
             self._modalita = maniglia
         elif self._rect.contains(pos):
