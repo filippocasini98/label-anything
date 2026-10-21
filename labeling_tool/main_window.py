@@ -223,6 +223,10 @@ class FinestraPrincipale(QMainWindow):
 
         side.addWidget(self._sezione("STRUMENTI"))
         self.combo_strumenti = QComboBox()
+        self.combo_strumenti.setToolTip(
+            "Tieni premuto Spazio (o trascina col tasto centrale del mouse) "
+            "per muoverti nell'immagine mentre usi qualsiasi strumento"
+        )
         self._popola_strumenti()
         self.combo_strumenti.currentIndexChanged.connect(self._strumento_cambiato)
         side.addWidget(self.combo_strumenti)

@@ -245,3 +245,75 @@ def test_seleziona_clic_su_spazio_vuoto_deseleziona(qapp):
     assert viewer.indice_selezionato() == 0
     _clicca(viewer, (60, 60))
     assert viewer.indice_selezionato() == -1
+
+
+# ------------------------------------------------------------ navigazione durante gli strumenti
+
+def _tasto(tipo, tasto):
+    from PySide6.QtGui import QKeyEvent
+    return QKeyEvent(tipo, tasto, Qt.KeyboardModifier.NoModifier)
+
+
+def _viewer_zoommato() -> ImageViewer:
+    viewer = _viewer_con_immagine()
+    viewer.resize(300, 300)
+    viewer.zoom_by(4.0)
+    return viewer
+
+
+def test_tasto_centrale_fa_pan_con_stumento_attivo(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    assert viewer.horizontalScrollBar().maximum() > 0
+    h0 = viewer.horizontalScrollBar().value()
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(150, 150),
+                                   Qt.MouseButton.MiddleButton, Qt.MouseButton.MiddleButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(170, 150),
+                                   Qt.MouseButton.MiddleButton, Qt.MouseButton.MiddleButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(170, 150),
+                                      Qt.MouseButton.MiddleButton, Qt.MouseButton.NoButton))
+    assert viewer.horizontalScrollBar().value() == h0 - 20
+    assert viewer._pan_in_corso is False
+
+
+def test_spazio_trascinamento_sinistro_fa_pan_con_stumento_attivo(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    h0 = viewer.horizontalScrollBar().value()
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    viewer.keyPressEvent(_tasto(QEvent.KeyPress, Qt.Key.Key_Space))
+    assert viewer.dragMode() == QGraphicsView.ScrollHandDrag
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(150, 150),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(170, 150),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(170, 150),
+                                      Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+    assert viewer.horizontalScrollBar().value() != h0
+    assert not aggiunte  # mentre si tiene lo spazio non si disegna
+
+
+def test_spazio_rilasciato_ripristina_lo_strumento(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    viewer.keyPressEvent(_tasto(QEvent.KeyPress, Qt.Key.Key_Space))
+    viewer.keyReleaseEvent(_tasto(QEvent.KeyRelease, Qt.Key.Key_Space))
+    assert viewer.dragMode() == QGraphicsView.NoDrag
+    # dopo il rilascio dello spazio il disegno funziona di nuovo
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(10, 10),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(250, 250),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(250, 250),
+                                      Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+    assert len(aggiunte) == 1
+    assert aggiunte[0]["tipo"] == "box"
