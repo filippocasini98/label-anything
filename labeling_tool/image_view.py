@@ -59,8 +59,12 @@ class BoxItem(QGraphicsItem):
         self._prima: Optional[dict] = None
 
     def set_rect(self, rect: QRectF) -> None:
-        self._rect = QRectF(rect)
+        # prepareGeometryChange va chiamato PRIMA di mutare il rect: Qt usa il
+        # boundingRect corrente per riallineare l'indice della scena. Chiamarla
+        # dopo la mutazione lascia nell'indice rettangoli stantii e il paint
+        # successivo va in segfault (SIGSEGV in QGraphicsView::paintEvent).
         self.prepareGeometryChange()
+        self._rect = QRectF(rect)
         self.update()
 
     def boundingRect(self) -> QRectF:
