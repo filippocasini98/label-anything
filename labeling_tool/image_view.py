@@ -84,11 +84,21 @@ class BoxItem(QGraphicsItem):
         }
 
     def _maniglia_sotto(self, pos: QPointF) -> Optional[str]:
-        soglia = MANIGLIA * 1.5
+        """Maniglia più vicina al punto entro la soglia, se il punto non è
+        nell'area interna del box (dove comanda lo spostamento)."""
+        interno = self._rect.adjusted(MANIGLIA, MANIGLIA, -MANIGLIA, -MANIGLIA)
+        if not interno.isEmpty() and interno.contains(pos):
+            return None
+        # box piccolo: soglia ridotta, altrimenti ogni punto interno è di una maniglia
+        soglia = MANIGLIA if interno.isEmpty() else MANIGLIA * 1.5
+        migliore: Optional[str] = None
+        distanza_min = soglia
         for nome, centro in self._maniglie().items():
-            if (pos - centro).manhattanLength() <= soglia:
-                return nome
-        return None
+            distanza = (pos - centro).manhattanLength()
+            if distanza < distanza_min:
+                migliore = nome
+                distanza_min = distanza
+        return migliore
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         pen = QPen(self.colore, 2)
@@ -107,9 +117,12 @@ class BoxItem(QGraphicsItem):
 
     def mousePressEvent(self, event) -> None:
         pos = event.pos()
-        if not self.selezionato and self.on_selezione:
+        gia_selezionato = self.selezionato
+        if not gia_selezionato and self.on_selezione:
             self.on_selezione(self.indice)
-        maniglia = self._maniglia_sotto(pos) if self.selezionato else None
+        # le maniglie si agganciano solo se il box era già selezionato:
+        # altrimenti il primo clic (che seleziona) partirebbe in resize
+        maniglia = self._maniglia_sotto(pos) if gia_selezionato else None
         if maniglia:
             self._modalita = maniglia
         elif self._rect.contains(pos):
@@ -199,6 +212,12 @@ class ImageViewer(QGraphicsView):
         self._inizio_drag: Optional[QPointF] = None
         self._anteprima_box: Optional[QGraphicsRectItem] = None
         self._distanza_p1: Optional[QPointF] = None
+        # navigazione con il tasto centrale o tenendo premuto Spazio
+        self._spazio_premuto = False
+        self._pan_in_corso = False
+        self._pan_partenza: Optional[QPointF] = None
+        self._pan_scrollbar = (0, 0)
+        self.setFocusPolicy(Qt.StrongFocus)
 
     # ---------------- immagine e zoom ----------------
 
@@ -252,6 +271,29 @@ class ImageViewer(QGraphicsView):
                 painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
 
     # ---------------- configurazione strumenti ----------------
+
+    def _cursore_strumento(self) -> None:
+        if self._strumento == "nav":
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            self.setCursor(crea_cursore(self._cursore))
+
+    def _avvia_pan(self, event) -> None:
+        """Pan col tasto centrale: attivo con qualsiasi strumento."""
+        self._pan_in_corso = True
+        self._pan_partenza = event.position()
+        self._pan_scrollbar = (self.horizontalScrollBar().value(), self.verticalScrollBar().value())
+        self.setCursor(Qt.ClosedHandCursor)
+
+    def _pan_in_movimento(self, event) -> None:
+        delta = event.position() - self._pan_partenza
+        self.horizontalScrollBar().setValue(int(self._pan_scrollbar[0] - delta.x()))
+        self.verticalScrollBar().setValue(int(self._pan_scrollbar[1] - delta.y()))
+
+    def _termina_pan(self) -> None:
+        self._pan_in_corso = False
+        self._pan_partenza = None
+        self._cursore_strumento()
 
     def set_strumento(self, strumento: str) -> None:
         if strumento not in self.STRUMENTI:
@@ -479,7 +521,19 @@ class ImageViewer(QGraphicsView):
         return self.mapToScene(event.position().toPoint())
 
     def mousePressEvent(self, event) -> None:
-        if self.pixmap_item.pixmap().isNull() or event.button() != Qt.LeftButton:
+        if self.pixmap_item.pixmap().isNull():
+            super().mousePressEvent(event)
+            return
+        if event.button() == Qt.MiddleButton:
+            # navigazione col tasto centrale attiva con qualsiasi strumento
+            self._avvia_pan(event)
+            event.accept()
+            return
+        if self._spazio_premuto and event.button() == Qt.LeftButton:
+            # tenendo Spazio il trascinamento sinistro fa pan (ScrollHandDrag)
+            super().mousePressEvent(event)
+            return
+        if event.button() != Qt.LeftButton:
             super().mousePressEvent(event)
             return
         punto = self._punto_scene(event)
@@ -544,6 +598,14 @@ class ImageViewer(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
+        if self._pan_in_corso:
+            self._pan_in_movimento(event)
+            if self.scene().mouseGrabberItem() is None:
+                event.accept()
+                return
+            # un item e' trascinato col tasto sinistro: continua a seguirlo
+            super().mouseMoveEvent(event)
+            return
         if self._croce_schermo:
             self._pos_mouse = self._punto_scene(event)
             self.viewport().update()
@@ -575,6 +637,10 @@ class ImageViewer(QGraphicsView):
         super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:
+        if self._pan_in_corso and event.button() == Qt.MiddleButton:
+            self._termina_pan()
+            event.accept()
+            return
         if self._strumento in ("box", "oggetto") and self._anteprima_box is not None and self._inizio_drag is not None:
             rett = self._anteprima_box.rect().normalized()
             self._annulla_disegno_corrente()
@@ -612,6 +678,13 @@ class ImageViewer(QGraphicsView):
         )
 
     def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key_Space and not event.isAutoRepeat():
+            self._spazio_premuto = True
+            if self._strumento != "nav":
+                self.setDragMode(QGraphicsView.ScrollHandDrag)
+                self.setCursor(Qt.OpenHandCursor)
+            event.accept()
+            return
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             if self._strumento == "poligono":
                 self._chiudi_poligono()
@@ -626,6 +699,18 @@ class ImageViewer(QGraphicsView):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event) -> None:
+        if event.key() == Qt.Key_Space and not event.isAutoRepeat():
+            self._spazio_premuto = False
+            if self._strumento == "nav":
+                self.setDragMode(QGraphicsView.ScrollHandDrag)
+            else:
+                self.setDragMode(QGraphicsView.NoDrag)
+            self._cursore_strumento()
+            event.accept()
+            return
+        super().keyReleaseEvent(event)
 
     def _chiudi_poligono(self) -> None:
         if len(self._punti_correnti) < 3:

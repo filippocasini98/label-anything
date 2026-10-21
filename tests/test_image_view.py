@@ -6,7 +6,7 @@ pytest.importorskip("PySide6")
 
 import numpy as np
 
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtWidgets import QApplication
 
 from labeling_tool.image_view import ImageViewer
@@ -168,3 +168,152 @@ def test_clic_vicino_ma_non_sul_primo_punto_aggiunge(qapp):
     _click(viewer, 20, 25)  # lontano dal primo vertice: nuovo punto, nessuna chiusura
     assert not aggiunte
     assert len(viewer._punti_correnti) == 4
+
+
+# ------------------------------------------------------------ strumento seleziona
+
+def _evento(tipo, widget_pos, bottone, bottoni):
+    from PySide6.QtGui import QMouseEvent
+    return QMouseEvent(tipo, widget_pos, widget_pos, bottone, bottoni,
+                       Qt.KeyboardModifier.NoModifier)
+
+
+def _trascina(viewer, da_scene, a_scene):
+    """Drag sinistro tra due punti in coordinate di scena, alla BoxItem."""
+    da_w = viewer.mapFromScene(QPointF(*da_scene))
+    a_w = viewer.mapFromScene(QPointF(*a_scene))
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, da_w,
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, a_w,
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, a_w,
+                                      Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+
+
+def _clicca(viewer, punto_scene):
+    _trascina(viewer, punto_scene, punto_scene)
+
+
+def _viewer_con_box() -> ImageViewer:
+    from labeling_tool.model import Record
+    viewer = _viewer_con_immagine()
+    viewer.set_strumento("seleziona")
+    record = Record(nome="img")
+    record.geometrie = [{"tipo": "box", "classe": "a", "x": 10.0, "y": 10.0, "w": 20.0, "h": 20.0}]
+    viewer.mostra_annotazioni(record)
+    return viewer
+
+
+def test_seleziona_primo_clic_dentro_il_box_seleziona_e_sposta(qapp):
+    viewer = _viewer_con_box()
+    modifiche = []
+    viewer.geometriaModificata.connect(lambda i, g: modifiche.append((i, g)))
+    _trascina(viewer, (20, 20), (30, 30))  # centro del box
+    assert viewer.indice_selezionato() == 0
+    assert len(modifiche) == 1
+    assert modifiche[0][1]["x"] == pytest.approx(20.0, abs=0.1)
+    assert modifiche[0][1]["y"] == pytest.approx(20.0, abs=0.1)
+
+
+def test_seleziona_box_piccolo_gia_selezionato_il_clic_al_centro_sposta(qapp):
+    viewer = _viewer_con_box()
+    _clicca(viewer, (20, 20))  # primo clic: seleziona
+    assert viewer.indice_selezionato() == 0
+    modifiche = []
+    viewer.geometriaModificata.connect(lambda i, g: modifiche.append((i, g)))
+    _trascina(viewer, (20, 20), (25, 25))  # centro: sposta, non ridimensiona
+    assert len(modifiche) == 1
+    assert modifiche[0][1]["x"] == pytest.approx(15.0, abs=0.1)
+    assert modifiche[0][1]["w"] == pytest.approx(20.0, abs=0.1)
+
+
+def test_seleziona_maniglia_br_ridimensiona_lato_e_altezza(qapp):
+    viewer = _viewer_con_box()
+    _clicca(viewer, (20, 20))  # seleziona
+    modifiche = []
+    viewer.geometriaModificata.connect(lambda i, g: modifiche.append((i, g)))
+    _trascina(viewer, (30, 30), (35, 35))  # angolo br
+    assert len(modifiche) == 1
+    g = modifiche[0][1]
+    assert g["w"] > 20.0
+    assert g["h"] > 20.0
+
+
+def test_seleziona_clic_su_spazio_vuoto_deseleziona(qapp):
+    viewer = _viewer_con_box()
+    _clicca(viewer, (20, 20))
+    assert viewer.indice_selezionato() == 0
+    _clicca(viewer, (60, 60))
+    assert viewer.indice_selezionato() == -1
+
+
+# ------------------------------------------------------------ navigazione durante gli strumenti
+
+def _tasto(tipo, tasto):
+    from PySide6.QtGui import QKeyEvent
+    return QKeyEvent(tipo, tasto, Qt.KeyboardModifier.NoModifier)
+
+
+def _viewer_zoommato() -> ImageViewer:
+    viewer = _viewer_con_immagine()
+    viewer.resize(300, 300)
+    viewer.zoom_by(4.0)
+    return viewer
+
+
+def test_tasto_centrale_fa_pan_con_stumento_attivo(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    assert viewer.horizontalScrollBar().maximum() > 0
+    h0 = viewer.horizontalScrollBar().value()
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(150, 150),
+                                   Qt.MouseButton.MiddleButton, Qt.MouseButton.MiddleButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(170, 150),
+                                   Qt.MouseButton.MiddleButton, Qt.MouseButton.MiddleButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(170, 150),
+                                      Qt.MouseButton.MiddleButton, Qt.MouseButton.NoButton))
+    assert viewer.horizontalScrollBar().value() == h0 - 20
+    assert viewer._pan_in_corso is False
+
+
+def test_spazio_trascinamento_sinistro_fa_pan_con_stumento_attivo(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    h0 = viewer.horizontalScrollBar().value()
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    viewer.keyPressEvent(_tasto(QEvent.KeyPress, Qt.Key.Key_Space))
+    assert viewer.dragMode() == QGraphicsView.ScrollHandDrag
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(150, 150),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(170, 150),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(170, 150),
+                                      Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+    assert viewer.horizontalScrollBar().value() != h0
+    assert not aggiunte  # mentre si tiene lo spazio non si disegna
+
+
+def test_spazio_rilasciato_ripristina_lo_strumento(qapp):
+    from PySide6.QtWidgets import QGraphicsView
+
+    viewer = _viewer_zoommato()
+    viewer.set_strumento("box")
+    aggiunte = []
+    viewer.geometriaAggiunta.connect(aggiunte.append)
+    viewer.keyPressEvent(_tasto(QEvent.KeyPress, Qt.Key.Key_Space))
+    viewer.keyReleaseEvent(_tasto(QEvent.KeyRelease, Qt.Key.Key_Space))
+    assert viewer.dragMode() == QGraphicsView.NoDrag
+    # dopo il rilascio dello spazio il disegno funziona di nuovo
+    viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, QPointF(10, 10),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseMoveEvent(_evento(QEvent.MouseMove, QPointF(250, 250),
+                                   Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
+    viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, QPointF(250, 250),
+                                      Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+    assert len(aggiunte) == 1
+    assert aggiunte[0]["tipo"] == "box"
