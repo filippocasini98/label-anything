@@ -6,7 +6,7 @@ pytest.importorskip("PySide6")
 
 import numpy as np
 
-from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
 from PySide6.QtWidgets import QApplication
 
 from labeling_tool.image_view import ImageViewer
@@ -180,6 +180,7 @@ def _evento(tipo, widget_pos, bottone, bottoni):
 
 def _trascina(viewer, da_scene, a_scene):
     """Drag sinistro tra due punti in coordinate di scena, alla BoxItem."""
+    from PySide6.QtWidgets import QApplication
     da_w = viewer.mapFromScene(QPointF(*da_scene))
     a_w = viewer.mapFromScene(QPointF(*a_scene))
     viewer.mousePressEvent(_evento(QEvent.MouseButtonPress, da_w,
@@ -188,6 +189,9 @@ def _trascina(viewer, da_scene, a_scene):
                                    Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton))
     viewer.mouseReleaseEvent(_evento(QEvent.MouseButtonRelease, a_w,
                                       Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton))
+    # il rilascio emette la modifica con un timer differito:
+    # gira il ciclo eventi come farebbe l'applicazione
+    QApplication.instance().processEvents()
 
 
 def _clicca(viewer, punto_scene):
@@ -245,6 +249,21 @@ def test_seleziona_clic_su_spazio_vuoto_deseleziona(qapp):
     assert viewer.indice_selezionato() == 0
     _clicca(viewer, (60, 60))
     assert viewer.indice_selezionato() == -1
+
+
+def test_set_rect_aggiorna_lindice_prima_della_mutazione(qapp):
+    """Contratto Qt: prepareGeometryChange deve vedere il vecchio boundingRect.
+    Chiamarla dopo la mutazione lascia nell'indice della scena rettangoli
+    stantii: il paint successivo segfaulta (SIGSEGV in paintEvent, il crash
+    che chiudeva il programma durante la modifica di un'annotazione)."""
+    viewer = _viewer_con_box()
+    box = viewer._boxes[0]
+    vecchio = QRectF(box.boundingRect())
+    visti = []
+    box.prepareGeometryChange = lambda: visti.append(QRectF(box.boundingRect()))
+    box.set_rect(QRectF(40.0, 40.0, 12.0, 12.0))
+    assert visti == [vecchio]  # al momento della chiamata il rect era ancora il vecchio
+    assert box.in_dict()["x"] == 40.0
 
 
 # ------------------------------------------------------------ navigazione durante gli strumenti
