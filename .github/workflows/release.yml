@@ -10,6 +10,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      versione: ${{ steps.versione.outputs.prossima }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +35,8 @@ jobs:
           {
             echo "Novita' dalla versione ${precedente:-inizio}:"
             echo
+            echo "- Self-contained binaries for Windows, macOS and Linux"
+            echo
             git log --pretty=format:'- %s' "${precedente}..HEAD" 2>/dev/null || git log --pretty=format:'- %s' HEAD
           } > note.md
         env:
@@ -51,3 +55,70 @@ jobs:
           gh release create "$prossima" Source-code.zip \
             --title "Label Anything $prossima" \
             --notes-file note.md
+
+  build:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            suffisso: win64
+          - os: macos-latest
+            suffisso: macOS
+          - os: ubuntu-latest
+            suffisso: linux64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Installa dipendenze di build
+        run: pip install -r requirements-build.txt pyinstaller
+
+      - name: Build con PyInstaller
+        run: pyinstaller --noconfirm label-anything.spec
+        env:
+          APP_VERSION: ${{ needs.release.outputs.versione }}
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p smoke/img
+          python - <<'PY'
+          import numpy as np, cv2
+          for i in range(2):
+              cv2.imwrite(f"smoke/img/img_{i}.png", np.zeros((32, 32, 3), dtype=np.uint8))
+          PY
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 20 dist/LabelAnything/LabelAnything smoke/img
+          codice=$?
+          set -e
+          [ "$codice" -eq 124 ] || { echo "Smoke test fallito (exit $codice)"; exit 1; }
+          echo "Smoke test OK: l'app e' rimasta in esecuzione 20s senza crash"
+
+      - name: Pacchetto (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            zip -r -y "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" LabelAnything.app
+          else
+            zip -r "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" LabelAnything
+          fi
+
+      - name: Pacchetto (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Compress-Archive -Path dist/LabelAnything -DestinationPath "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip"
+
+      - name: Allega alla release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${{ needs.release.outputs.versione }}" "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" --clobber
