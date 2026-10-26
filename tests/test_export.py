@@ -217,3 +217,43 @@ def test_report_statistiche_poligoni_per_classe(tmp_path: Path):
     assert "larghezza media,30.000" in testo    # (50+10)/2
     assert "altezza media,30.000" in testo       # (50+10)/2
     assert "area media,1300.000" in testo        # (2500+100)/2
+
+
+def test_esporta_html(tmp_path: Path):
+    import base64 as b64lib
+
+    import cv2
+    import numpy as np
+
+    from labeling_tool.export import esporta_html
+
+    for nome in ("a.jpg", "b.jpg"):
+        cv2.imwrite(str(tmp_path / nome), np.full((100, 200, 3), 200, dtype=np.uint8))
+    progetto = progetto_esempio()
+    dest = tmp_path / "visualizzazione.html"
+    esporta_html(progetto, ["a.jpg", "b.jpg"], tmp_path, dest)
+    testo = dest.read_text(encoding="utf-8")
+    assert "data:image/jpeg;base64," in testo
+    assert 'id="dati-json"' in testo
+    assert "a.jpg" in testo and "b.jpg" in testo
+    # i dati incorporati contengono le geometrie del progetto
+    dati = json.loads(testo.split('id="dati-json">')[1].split("</script>")[0])
+    assert dati["immagini"]["a.jpg"]["geometrie"][0]["tipo"] == "box"
+    assert dati["immagini"]["a.jpg"]["geometrie"][1]["tipo"] == "poligono"
+    assert dati["totale"] == 2
+    # le immagini sono valide e quella annotata ha il box disegnato
+    figura_a = testo.split("<figure>")[1]
+    raw = b64lib.b64decode(figura_a.split('base64,')[1].split('"')[0])
+    img = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+    assert img is not None and img.shape == (100, 200, 3)
+    assert (img < 200).any()  # il bordo bianco/nero del box abbassa i pixel
+
+
+def test_esporta_html_immagine_mancante(tmp_path: Path):
+    from labeling_tool.export import esporta_html
+
+    dest = tmp_path / "visualizzazione.html"
+    esporta_html(progetto_esempio(), ["a.jpg", "b.jpg"], tmp_path, dest)
+    testo = dest.read_text(encoding="utf-8")
+    assert "immagine non disponibile" in testo
+    assert 'id="dati-json"' in testo
