@@ -42,7 +42,12 @@ a = Analysis(
     noarchive=False,
 )
 
-_esclusioni_plugin = ("qtwebengine", "qt3d", "qtquick", "qtvirtualkeyboard")
+_esclusioni_plugin = (
+    "qtwebengine", "qt3d", "qtquick", "qtvirtualkeyboard",
+    "qtquick", "qtqml", "qtnetwork", "qtpdf",
+    "opengl32sw", "videoio_ffmpeg", "qpdf", "plugins/networkinformation", "plugins/tls",
+    "libcrypto-3-x64", "libssl-3-x64",
+)
 a.binaries = [b for b in a.binaries if not any(x in b[0].lower() for x in _esclusioni_plugin)]
 a.datas = [d for d in a.datas if not any(x in d[0].lower() for x in _esclusioni_plugin)]
 
