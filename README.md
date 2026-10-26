@@ -2,15 +2,40 @@
 
 Desktop tool (PySide6 + OpenCV) to label, annotate and analyze any kind of image. Fully configurable from the GUI: no config file to edit by hand.
 
-## Requirements
+## Download (no Python needed)
+
+**[⬇️ Download the latest release](https://github.com/filippocasini98/label-anything/releases/latest)** and grab the binary for your platform — no Python or setup required, just unzip and double-click:
+
+- **Windows**: `LabelAnything-<version>-win64.zip` → extract and run `LabelAnything.exe`
+- **macOS**: `LabelAnything-<version>-macOS.zip` → extract and run `Label Anything.app`
+- **Linux**: `LabelAnything-<version>-linux64.zip` → extract and run `LabelAnything`
+
+The binaries are built automatically for every release by GitHub Actions (PyInstaller, onedir: fast startup, no temporary unpacking). The `Source code` asset is there for developers.
+
+### macOS: first launch (Gatekeeper)
+
+The app is not signed with an Apple Developer certificate, so Gatekeeper blocks it on first launch. To open it:
+
+- **Way 1**: right-click (or `Ctrl`+click) `Label Anything.app` → **Open** → **Open** in the dialog. This is only needed once.
+- **Way 2**: after extracting, run in Terminal:
+
+```bash
+xattr -cr "Label Anything.app"
+```
+
+### Linux: system libraries
+
+On minimal distributions, install the graphics libraries Qt needs (they are not bundled in the zip):
+
+```bash
+sudo apt install libgl1 libegl1   # Debian/Ubuntu and derivatives
+```
+
+## Requirements (running from source)
 
 Python 3.9 or newer (macOS, Windows or Linux). Everything else is installed automatically.
 
-## Download
-
-**[⬇️ Download the latest release](https://github.com/filippocasini98/label-anything/releases/latest)** from the Releases page (*Source code* asset), unzip it and continue with the first-time setup.
-
-Or download and set everything up with a single command:
+### One-command install
 
 **macOS / Linux:**
 
@@ -20,11 +45,11 @@ curl -fsSL https://raw.githubusercontent.com/filippocasini98/label-anything/main
 
 **Windows:** download [`install.bat`](https://github.com/filippocasini98/label-anything/raw/main/install.bat) and double-click it.
 
-## First-time setup (once)
+## First-time setup from source (once)
 
 Double-click `setup.command` (macOS) or `setup.bat` (Windows): it creates the virtual environment and installs PySide6, OpenCV and numpy.
 
-## Running
+## Running (from source)
 
 Double-click `start.command` (macOS) or `start.bat` (Windows), or:
 
@@ -96,11 +121,13 @@ Additional exports from the "Export" menu: COCO detection/segmentation, YOLO det
 
 Structure: `labeling_tool/` — `config.py` (schema and validation), `model.py` (records, project, undo/redo, calculations), `io_utils.py` (scanning and cache), `export.py` (formats, pure functions), `cursors.py` (annotation cursors), `image_view.py` (annotation viewer), `settings_dialog.py` (wizard and editor), `main_window.py` (main UI).
 
-Every merge to `main` automatically produces a release (tag with bumped minor version and an attached `Source-code.zip`) via GitHub Actions (`.github/workflows/release.yml`).
+Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`.
+
+The optional **"Double-clickable macOS app"** section below is superseded by the release binaries, which already ship a real `Label Anything.app` bundle.
 
 ## Sharing the program
 
-The program folder is self-contained: just copy or zip it (without `venv/`, `__pycache__/` and the `*.progetto.json` labeling projects). Whoever receives it runs `setup` once and then `start`. Labeling data always stays in the user's images folder, never inside the program.
+Easiest: share the **release binary** for the recipient's platform — nothing to install. Alternative from source: the program folder is self-contained, just copy or zip it (without `venv/`, `__pycache__/` and the `*.progetto.json` labeling projects). Whoever receives it runs `setup` once and then `start`. Labeling data always stays in the user's images folder, never inside the program.
 
 ## License
 

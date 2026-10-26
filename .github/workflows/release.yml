@@ -56,6 +56,22 @@ jobs:
             --title "Label Anything $prossima" \
             --notes-file note.md
 
+      - name: Pulizia binari release vecchie (ultime 2 conservate)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # elimina gli asset binari dalle release piu' vecchie, tenendo le 2 piu' recenti
+          mapfile -t vecchie < <(gh release list --limit 100 --json tagName --jq '.[].tagName' | tail -n +3)
+          for rel in "${vecchie[@]}"; do
+            [ -z "$rel" ] && continue
+            mapfile -t asset < <(gh release view "$rel" --json assets --jq '.assets[].name' | grep '^LabelAnything-.*\.zip$') || continue
+            for a in "${asset[@]}"; do
+              [ -z "$a" ] && continue
+              echo "Rimuovo $a dalla release $rel"
+              gh release delete-asset "$rel" "$a" --yes || true
+            done
+          done
+
   build:
     needs: release
     strategy:
