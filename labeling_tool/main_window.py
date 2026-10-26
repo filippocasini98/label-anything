@@ -36,6 +36,7 @@ from labeling_tool.cursors import CURSORI, leggi_cursore, salva_cursore
 from labeling_tool.export import (
     esporta_coco,
     esporta_csv,
+    esporta_html,
     esporta_labelme,
     esporta_maschere,
     esporta_yolo,
@@ -445,6 +446,7 @@ class FinestraPrincipale(QMainWindow):
             ("LabelMe", self._export_labelme),
             ("Maschere PNG", self._export_maschere),
             ("Report statistiche", self._export_report),
+            ("Visualizzazione HTML", self._export_html),
         ]
         for testo, callback in definizioni:
             menu.addAction(testo, callback)
@@ -811,13 +813,19 @@ class FinestraPrincipale(QMainWindow):
         self._scrivi_csv_dati()
 
     def _scrivi_csv_dati(self) -> None:
-        """CSV sempre aggiornati nella cartella dati: dettaglio per immagine e statistiche."""
+        """File sempre aggiornati nella cartella dati: dettaglio per immagine,
+        statistiche e visualizzazione HTML autonoma (da condividere senza
+        installare il programma)."""
         nomi = [p.name for p in self.immagini]
         try:
             esporta_csv(self.progetto, nomi, self.cartella_dati / "etichette.csv")
             report_statistiche(self.progetto, nomi, self.cartella_dati / "statistiche.csv")
         except OSError as errore:
             self.stato_label.setText(f"Avviso: CSV non aggiornati ({errore})")
+        try:
+            esporta_html(self.progetto, nomi, self.cartella, self.cartella_dati / "visualizzazione.html")
+        except (OSError, ValueError) as errore:
+            self.stato_label.setText(f"Avviso: visualizzazione HTML non aggiornata ({errore})")
 
     # ------------------------------------------------------------ undo/redo
 
@@ -997,6 +1005,14 @@ class FinestraPrincipale(QMainWindow):
         cartella = dest / "maschere"
         esporta_maschere(self.progetto, self._nomi_visibili(), cartella, dimensioni=self._dimensioni_visibili())
         self.stato_label.setText(f"Esportato {cartella}")
+
+    def _export_html(self) -> None:
+        dest = self._destinazione("Cartella per la visualizzazione HTML")
+        if not dest:
+            return
+        percorso = dest / "visualizzazione.html"
+        esporta_html(self.progetto, self._nomi_visibili(), self.cartella, percorso)
+        self.stato_label.setText(f"Esportato {percorso}")
 
     def _export_report(self) -> None:
         dest = self._destinazione("Cartella per il report statistiche")
