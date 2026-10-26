@@ -170,11 +170,11 @@ jobs:
       - name: Pacchetto (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          cd dist
+          zip="LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip"
           if [ "${{ runner.os }}" = "macOS" ]; then
-            zip -r -y "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" "Label Anything.app"
+            cd dist && zip -r -y "../$zip" "Label Anything.app"
           else
-            zip -r "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" LabelAnything
+            cd dist && zip -r "../$zip" LabelAnything
           fi
 
       - name: Pacchetto (Windows)
