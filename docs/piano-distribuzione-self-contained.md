@@ -85,6 +85,15 @@
 | Job CI di build | ~4-5 min | ~2-3 min |
 | Esperienza utente | install.bat + venv + Python | scarica zip → doppio click |
 
+### Risultato effettivo (v1.11.0 + PR dedup)
+
+| Piattaforma | Zip | Note |
+|---|---|---|
+| Windows | ~85 MB | nel target |
+| macOS | ~79 MB | nel target |
+| Linux | ~208 MB | fuori target: il wheel manylinux di opencv ha DT_NEEDED rigido su ffmpeg (avcodec/avformat/avutil/swscale, ~40 MB) e OpenBLAS (37 MB), non rimovibili; Qt porta ICU (31 MB). La dedup delle librerie doppie ha gia' tolto ~120 MB scompattati (595 → 375 MB). |
+
+
 ## Rischi e mitigazioni
 
 - **Esclusioni Qt troppo aggressive** (es. `QtNetwork` a volte richiesto dietro le quinte): mitigate dallo smoke test in CI sull'eseguibile reale.
