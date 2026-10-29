@@ -3,7 +3,7 @@
 import os
 import re
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 _RE_COLORE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -50,6 +50,11 @@ class ProgettoConfig:
     scala_px_per_unita: float = 1.0
     misure_abilitate: bool = True
     filtri_abilitati: bool = True
+    # annotazione assistita
+    modello_percorso: str = ""
+    modello_soglia: float = 0.25
+    mappa_classi: Dict[str, str] = field(default_factory=dict)
+    salta_gia_annotate: bool = True
 
     def valida(self) -> List[str]:
         """Ritorna la lista degli errori di configurazione (vuota se valida)."""
@@ -126,6 +131,10 @@ def config_in_dict(c: ProgettoConfig) -> dict:
         "scala_px_per_unita": c.scala_px_per_unita,
         "misure_abilitate": c.misure_abilitate,
         "filtri_abilitati": c.filtri_abilitati,
+        "modello_percorso": c.modello_percorso,
+        "modello_soglia": c.modello_soglia,
+        "mappa_classi": dict(c.mappa_classi),
+        "salta_gia_annotate": c.salta_gia_annotate,
     }
 
 
@@ -138,6 +147,10 @@ def config_da_dict(d: dict) -> ProgettoConfig:
         scala = float(scala)
     except (TypeError, ValueError):
         scala = default.scala_px_per_unita
+    try:
+        soglia_modello = float(d.get("modello_soglia", default.modello_soglia))
+    except (TypeError, ValueError):
+        soglia_modello = default.modello_soglia
     return ProgettoConfig(
         nome_progetto=str(d.get("nome_progetto", default.nome_progetto)).strip() or default.nome_progetto,
         etichettatore=str(d.get("etichettatore", "")),
@@ -150,4 +163,8 @@ def config_da_dict(d: dict) -> ProgettoConfig:
         scala_px_per_unita=scala,
         misure_abilitate=bool(d.get("misure_abilitate", True)),
         filtri_abilitati=bool(d.get("filtri_abilitati", True)),
+        modello_percorso=str(d.get("modello_percorso", "")),
+        modello_soglia=soglia_modello,
+        mappa_classi={str(k): str(v) for k, v in d.get("mappa_classi", {}).items()},
+        salta_gia_annotate=bool(d.get("salta_gia_annotate", True)),
     )

@@ -81,6 +81,7 @@ with a `Contents/Info.plist` pointing `CFBundleExecutable` to `LabelAnything` (s
 - **Classification**: labels with configurable shortcut keys; single-label mode (auto-advance after assignment) or multi-label mode (toggle).
 - **Geometries** ("classification + geometries" or "geometries only" workflow): bounding boxes dragged on screen, resizable with 8 handles and movable; click-to-draw polygons, closed with Enter. Per-object class is selectable. The **size of every geometry** is shown on the image, reported in `etichette.csv` and aggregated per class in `statistiche.csv`: for boxes width/height/area, for polygons bounding box and area (mean, min, max, in px or in the configured unit).
 - **Measurements** (if enabled): distance between two clicks (px and configured unit via px/unit scale), polygon area, click object counting, **object dimensions** (dragged rectangle: width, height and area in px and in the configured unit — useful e.g. to measure stomata in electron microscope images). All measurements are saved and re-displayed.
+- **Auto-annotation**: annotate with YOLO/Ultralytics models (`.pt`/`.onnx`, detection → boxes, segmentation → polygons) run in-app — requires the optional `pip install ultralytics` package — or import ready-made annotations in YOLO txt, COCO json, LabelMe json or Pascal VOC xml format. Source classes are mapped onto the project labels in a dialog (confidence threshold, "skip images that already have geometries" option). Every model-annotated image stays **to verify**: fix it with the normal tools (move, resize, `Delete`, change class on the selected geometry) and approve with `V`, which jumps to the next image to verify; dedicated "To verify (model)" filter.
 - **Visual analysis**: brightness, contrast, grayscale, CLAHE equalization, zoom/pan.
 - **Statistics**: label distribution, progress, reviews, geometry and measurement counts; exportable to CSV.
 - **Filters**: by status (unlabeled, to review, reviewed, with notes, with geometries) and by label.
@@ -97,6 +98,7 @@ with a `Contents/Info.plist` pointing `CFBundleExecutable` to `LabelAnything` (s
 - `G` grayscale, `H` equalize, `R` reset view, `+`/`-` zoom
 - `Enter` closes polygon/area, `Esc` cancels drawing, `Delete` deletes the selected geometry/measurement (or the labels)
 - Polygon/area can also be closed by clicking the first vertex or double-clicking; the label combobox changes the class of the selected box
+- `V` approves the image (model annotations)
 
 ## Data and export
 
@@ -124,6 +126,8 @@ Structure: `labeling_tool/` — `config.py` (schema and validation), `model.py` 
 Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`.
 
 The optional **"Double-clickable macOS app"** section below is superseded by the release binaries, which already ship a real `Label Anything.app` bundle.
+
+In-app inference requires the optional package: `./venv/bin/pip install ultralytics`. Without it, annotation import (YOLO/COCO/LabelMe/VOC) and everything else remain available.
 
 ## Sharing the program
 

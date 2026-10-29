@@ -46,7 +46,7 @@ def _bbox_poligono(punti) -> Tuple[float, float, float, float]:
 def esporta_csv(progetto: Progetto, nomi: Iterable[str], dest: Path) -> None:
     intestazione = [
         "Nome Immagine", "Num Etichette", "Etichette", "Stato", "Note",
-        "Da revisionare", "Revisionata", "Data modifica", "Etichettatore",
+        "Da revisionare", "Revisionata", "Da Verificare", "Data modifica", "Etichettatore",
         "Num Geometrie", "Num Misure", "Geometrie", "Misure",
     ]
     unita = progetto.config.unita_misura
@@ -65,6 +65,7 @@ def esporta_csv(progetto: Progetto, nomi: Iterable[str], dest: Path) -> None:
                 "Note": r.note,
                 "Da revisionare": "Si" if r.da_revisionare else "No",
                 "Revisionata": "Si" if r.revisionata else "No",
+                "Da Verificare": "Si" if r.da_verificare else "No",
                 "Data modifica": r.data_modifica,
                 "Etichettatore": r.etichettatore,
                 "Num Geometrie": len(r.geometrie),
@@ -331,6 +332,8 @@ def report_statistiche(progetto: Progetto, nomi: Iterable[str], dest: Path) -> N
                          f"{sum(r.da_revisionare for r in records) / totale * 100:.1f}%"])
         writer.writerow(["Revisione", "revisionate", sum(r.revisionata for r in records),
                          f"{sum(r.revisionata for r in records) / totale * 100:.1f}%"])
+        writer.writerow(["Revisione", "da verificare (modello)", sum(r.da_verificare for r in records),
+                         f"{sum(r.da_verificare for r in records) / totale * 100:.1f}%"])
         writer.writerow(["Geometrie", "totale", sum(len(r.geometrie) for r in records), ""])
         writer.writerow(["Misure", "totale", sum(len(r.misure) for r in records), ""])
         oggetti = [m for r in records for m in r.misure if m.tipo == "oggetto" and len(m.punti) >= 2]
