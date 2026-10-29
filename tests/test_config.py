@@ -68,3 +68,38 @@ def test_da_dict_tollerante():
     c = config_da_dict(d)
     assert c.multi_label is False
     assert c.scala_px_per_unita == 1.0
+
+
+def test_config_campi_modello_default():
+    c = config_default()
+    assert c.modello_percorso == ""
+    assert c.modello_soglia == 0.25
+    assert c.mappa_classi == {}
+    assert c.salta_gia_annotate is True
+
+
+def test_round_trip_campi_modello():
+    c = config_default()
+    c.modello_percorso = "yolo11n.pt"
+    c.modello_soglia = 0.5
+    c.mappa_classi = {"uva": "acino"}
+    c.salta_gia_annotate = False
+    assert config_da_dict(config_in_dict(c)) == c
+
+
+def test_da_dict_campi_modello_mancanti():
+    d = config_in_dict(config_default())
+    for chiave in ("modello_percorso", "modello_soglia", "mappa_classi", "salta_gia_annotate"):
+        del d[chiave]
+    c = config_da_dict(d)
+    assert c.modello_percorso == ""
+    assert c.modello_soglia == 0.25
+    assert c.mappa_classi == {}
+    assert c.salta_gia_annotate is True
+
+
+def test_da_dict_soglia_modello_non_numerica():
+    d = config_in_dict(config_default())
+    d["modello_soglia"] = "alto"
+    c = config_da_dict(d)
+    assert c.modello_soglia == 0.25

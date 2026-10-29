@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSlider,
@@ -42,6 +43,15 @@ from labeling_tool.export import (
     esporta_yolo,
     report_statistiche,
 )
+from labeling_tool.annotazioni_auto import (
+    da_coco,
+    da_labelme,
+    da_voc,
+    da_yolo,
+    filtra_e_abbina,
+    ultralytics_disponibile,
+)
+from labeling_tool.auto_dialog import DialogoMappatura, WorkerAnnotazione
 from labeling_tool.image_view import ImageViewer
 from labeling_tool.io_utils import (
     ImageCache,
@@ -55,6 +65,7 @@ from labeling_tool.settings_dialog import EditorConfigurazione
 
 COLORE_NON_ASSEGNATA = "#E74C3C"
 COLORE_REVISIONE = "#00A8E8"
+COLORE_DA_VERIFICARE = "#9B59B6"
 PRECARICA_PRIMA = 2
 PRECARICA_DOPO = 4
 
@@ -92,6 +103,7 @@ class FinestraPrincipale(QMainWindow):
         self.cache = ImageCache()
         self.storico = []
         self.storico_redo = []
+        self._worker_annotazione = None
         self.indice = self._prima_da_completare()
         self.indici_visibili: List[int] = []
         self.salvato = True
@@ -214,6 +226,9 @@ class FinestraPrincipale(QMainWindow):
         self.bottone_conferma_revisione = QPushButton("Conferma revisione [Invio]")
         self.bottone_conferma_revisione.clicked.connect(self._conferma_revisione)
         side.addWidget(self.bottone_conferma_revisione)
+        self.bottone_approva = QPushButton("Approva immagine [V]")
+        self.bottone_approva.clicked.connect(self._approva_immagine)
+        side.addWidget(self.bottone_approva)
 
         side.addWidget(self._sezione("NOTE"))
         self.note_edit = QPlainTextEdit()
@@ -315,7 +330,8 @@ class FinestraPrincipale(QMainWindow):
     def _popola_filtri(self) -> None:
         self.combo_filtro.blockSignals(True)
         self.combo_filtro.clear()
-        voci = ["Tutte", "Non etichettate", "Da revisionare", "Revisionate", "Con note", "Con geometrie"]
+        voci = ["Tutte", "Non etichettate", "Da revisionare", "Revisionate",
+                "Da verificare (modello)", "Con note", "Con geometrie"]
         voci += [f"Etichetta: {e.nome}" for e in self.progetto.config.etichette]
         self.combo_filtro.addItems(voci)
         self.combo_filtro.blockSignals(False)
@@ -396,6 +412,7 @@ class FinestraPrincipale(QMainWindow):
         aggiungi("Prossima da etichettare", "N", self.prossima_da_etichettare)
 
         toolbar.addWidget(self._bottone_export())
+        toolbar.addWidget(self._bottone_auto_annota())
 
         self.combo_cursore = QComboBox()
         self.combo_cursore.setToolTip("Puntatore per gli strumenti di disegno")
@@ -424,6 +441,7 @@ class FinestraPrincipale(QMainWindow):
             ("-", lambda: self.viewer.zoom_by(1 / 1.2)),
             ("Delete", self._elimina_selezionato),
             ("Escape", self._escape),
+            ("V", self._approva_immagine),
         ]
         for scorciatoia, callback in scorciatoie:
             azione = QAction(self)
@@ -450,6 +468,28 @@ class FinestraPrincipale(QMainWindow):
         ]
         for testo, callback in definizioni:
             menu.addAction(testo, callback)
+        bottone.setMenu(menu)
+        return bottone
+
+    def _bottone_auto_annota(self) -> QPushButton:
+        from PySide6.QtWidgets import QMenu
+
+        bottone = QPushButton("Auto-annota")
+        menu = QMenu(bottone)
+        if ultralytics_disponibile():
+            menu.addAction("Scegli modello...", self._configura_modello)
+            menu.addAction("Annota immagine corrente...", lambda: self._auto_annota("corrente"))
+            menu.addAction("Annota tutte le immagini...", lambda: self._auto_annota("tutte"))
+            menu.addSeparator()
+        else:
+            voce = menu.addAction("Installa ultralytics per l'inferenza (pip install ultralytics)")
+            voce.setEnabled(False)
+            menu.addSeparator()
+        sotto_menu = menu.addMenu("Importa annotazioni")
+        sotto_menu.addAction("YOLO (cartella di file .txt)", self._importa_yolo)
+        sotto_menu.addAction("COCO (file json)", self._importa_coco)
+        sotto_menu.addAction("LabelMe (cartella di file json)", self._importa_labelme)
+        sotto_menu.addAction("Pascal VOC (cartella di file xml)", self._importa_voc)
         bottone.setMenu(menu)
         return bottone
 
@@ -491,6 +531,8 @@ class FinestraPrincipale(QMainWindow):
     def _colore_record(self, record: Record) -> str:
         if record.da_revisionare:
             return COLORE_REVISIONE
+        if record.da_verificare:
+            return COLORE_DA_VERIFICARE
         if self.progetto.config.workflow == "geometrie":
             if record.geometrie:
                 return self.progetto.config.colore_di(record.geometrie[0].get("classe", ""))
@@ -529,9 +571,12 @@ class FinestraPrincipale(QMainWindow):
             badge += " • DA REVISIONARE"
         if record.revisionata:
             badge += " • REV"
+        if record.da_verificare:
+            badge += " • DA VERIFICARE"
         self.badge.setText(badge)
         self.badge.setStyleSheet(f"background:{self._colore_record(record)}; color:white;")
         self._evidenzia_bottoni_etichette(record)
+        self.bottone_approva.setVisible(record.da_verificare)
 
         self._aggiorna_progresso()
         self._aggiorna_statistiche()
@@ -589,6 +634,7 @@ class FinestraPrincipale(QMainWindow):
             righe.append(f'<span style="color:{e.colore}">●</span> {e.nome}: <b>{n}</b> ({pct:.1f}%)<br>')
         righe.append(f"<br>Da revisionare: <b>{sum(r.da_revisionare for r in records)}</b>")
         righe.append(f"<br>Revisionate: <b>{sum(r.revisionata for r in records)}</b>")
+        righe.append(f"<br>Da verificare (modello): <b>{sum(r.da_verificare for r in records)}</b>")
         righe.append(f"<br>Geometrie: <b>{sum(len(r.geometrie) for r in records)}</b>")
         righe.append(f"<br>Misure: <b>{sum(len(r.misure) for r in records)}</b>")
         self.etichetta_statistiche.setText("".join(righe))
@@ -705,6 +751,26 @@ class FinestraPrincipale(QMainWindow):
         self.mostra_indice(self.indice)
         self._programma_salvataggio()
 
+    def _approva_immagine(self) -> None:
+        record = self._record_corrente()
+        if not record.da_verificare:
+            return
+        nuovo = record.copia()
+        nuovo.da_verificare = False
+        nuovo.revisionata = True
+        self._modifica_record(nuovo)
+        self._programma_salvataggio()
+        self._prossima_da_verificare()
+
+    def _prossima_da_verificare(self) -> None:
+        for offset in range(1, len(self.immagini) + 1):
+            i = (self.indice + offset) % len(self.immagini)
+            if self.progetto.immagini[self.immagini[i].name].da_verificare:
+                self.mostra_indice(i)
+                return
+        self.mostra_indice(self.indice)
+        self.stato_label.setText("Nessun'altra immagine da verificare")
+
     def _note_modificate(self) -> None:
         if self._caricamento_ui:
             return
@@ -779,15 +845,18 @@ class FinestraPrincipale(QMainWindow):
         nome = self.combo_classe.currentText()
         self.viewer.set_classe_attiva(nome)
         # un box selezionato cambia etichetta quando si sceglie un'altra classe
-        indice_box = self.viewer.indice_selezionato()
-        if indice_box >= 0:
-            record = self._record_corrente()
-            nuovo = record.copia()
-            if 0 <= indice_box < len(nuovo.geometrie) and nuovo.geometrie[indice_box].get("tipo") == "box":
-                nuovo.geometrie[indice_box]["classe"] = nome
-                self._modifica_record(nuovo)
-                self.viewer.mostra_annotazioni(nuovo)
-                self._programma_salvataggio()
+        indice = self.viewer.indice_selezionato()
+        if indice < 0:
+            return
+        record = self._record_corrente()
+        nuovo = record.copia()
+        if indice < len(nuovo.geometrie) and nuovo.geometrie[indice].get("classe") != nome:
+            g = dict(nuovo.geometrie[indice])
+            g["classe"] = nome
+            nuovo.geometrie[indice] = g
+            self._modifica_record(nuovo)
+            self.viewer.mostra_annotazioni(nuovo)
+            self._programma_salvataggio()
 
     # ------------------------------------------------------------ salvataggio
 
@@ -865,6 +934,7 @@ class FinestraPrincipale(QMainWindow):
                 or (testo == "Non etichettate" and not self._record_completato(r))
                 or (testo == "Da revisionare" and r.da_revisionare)
                 or (testo == "Revisionate" and r.revisionata)
+                or (testo == "Da verificare (modello)" and r.da_verificare)
                 or (testo == "Con note" and bool(r.note))
                 or (testo == "Con geometrie" and bool(r.geometrie))
                 or (testo.startswith("Etichetta: ") and testo[len("Etichetta: "):] in r.etichette)
@@ -917,7 +987,13 @@ class FinestraPrincipale(QMainWindow):
         if dialogo.exec() != EditorConfigurazione.Accepted or dialogo.nuova_config is None:
             return
         vecchio_nome = self.progetto.config.nome_progetto
-        self.progetto.config = dialogo.nuova_config
+        vecchia = self.progetto.config
+        nuova = dialogo.nuova_config
+        nuova.modello_percorso = vecchia.modello_percorso
+        nuova.modello_soglia = vecchia.modello_soglia
+        nuova.mappa_classi = vecchia.mappa_classi
+        nuova.salta_gia_annotate = vecchia.salta_gia_annotate
+        self.progetto.config = nuova
         if vecchio_nome != self.progetto.config.nome_progetto:
             percorso_vecchio = self.percorso_progetto
             self.percorso_progetto = self.cartella / f"{self.progetto.config.nome_progetto}.progetto.json"
@@ -1039,7 +1115,181 @@ class FinestraPrincipale(QMainWindow):
         self._finestra_figlia = nuova
         self.close()
 
+    # ------------------------------------------------------------ auto-annotazione
+
+    def _configura_modello(self) -> None:
+        dialogo = DialogoMappatura(self.progetto.config, con_modello=True, parent=self)
+        if dialogo.exec() != DialogoMappatura.Accepted:
+            return
+        self._salva_config_modello(dialogo)
+        self.stato_label.setText(f"Modello configurato: {Path(dialogo.modello_percorso).name}")
+
+    def _salva_config_modello(self, dialogo: DialogoMappatura) -> None:
+        config = self.progetto.config
+        config.modello_percorso = dialogo.modello_percorso
+        config.modello_soglia = dialogo.soglia
+        config.mappa_classi = dict(dialogo.mappa)
+        config.salta_gia_annotate = dialogo.salta
+        self.salva()
+
+    def _auto_annota(self, ambito: str) -> None:
+        dialogo = DialogoMappatura(self.progetto.config, con_modello=True, parent=self)
+        if dialogo.exec() != DialogoMappatura.Accepted or not dialogo.modello_percorso:
+            return
+        self._salva_config_modello(dialogo)
+        if ambito == "corrente":
+            percorsi = [self.immagini[self.indice]]
+        else:
+            percorsi = list(self.immagini)
+        geometrie_esistenti = {p.name for p in self.immagini
+                               if self.progetto.immagini[p.name].geometrie}
+        self._esegui_annotazione(dialogo.modello_percorso, percorsi, dialogo.soglia,
+                                 dialogo.mappa, dialogo.salta, geometrie_esistenti)
+
+    def _esegui_annotazione(self, percorso_modello: str, percorsi, soglia: float,
+                            mappa: dict, salta: bool, geometrie_esistenti: set) -> None:
+        avanzamento = QProgressDialog("Annotazione automatica in corso...", "Annulla",
+                                      0, len(percorsi), self)
+        avanzamento.setWindowTitle("Auto-annota")
+        avanzamento.setMinimumDuration(300)
+        avanzamento.setWindowModality(Qt.WindowModal)
+        self._worker_annotazione = WorkerAnnotazione(
+            percorso_modello, percorsi, soglia, mappa, salta, geometrie_esistenti, self)
+        self._worker_annotazione.progresso.connect(avanzamento.setValue)
+        self._worker_annotazione.immagineAnnotata.connect(self._annotazione_immagine)
+        self._worker_annotazione.finito.connect(
+            lambda a, s, e: self._annotazione_finita(avanzamento, a, s, e))
+        self._worker_annotazione.erroreCaricamento.connect(
+            lambda messaggio: self._annotazione_finita(avanzamento, 0, 0, 0, errore=messaggio))
+        avanzamento.canceled.connect(self._worker_annotazione.annulla)
+        avanzamento.show()
+        self._worker_annotazione.start()
+
+    def _annotazione_immagine(self, nome: str, geometrie: list) -> None:
+        if geometrie:
+            self._applica_geometrie_auto({nome: geometrie}, salta_gia=False,
+                                         salva_ora=False, aggiorna_ui=False)
+
+    def _annotazione_finita(self, avanzamento, annotate: int, saltate: int, errori: int,
+                            errore: str = "") -> None:
+        avanzamento.cancel()
+        avanzamento.close()
+        self._worker_annotazione = None
+        if errore:
+            QMessageBox.critical(self, "Errore", f"Modello non caricabile:\n{errore}")
+            return
+        if annotate:
+            self.salva()
+            self.aggiorna_filtri(mantieni_corrente=True)
+            self.mostra_indice(self.indice)
+        self.stato_label.setText(
+            f"Auto-annotazione: {annotate} immagini annotate, {saltate} saltate, {errori} errori")
+
+    def _applica_geometrie_auto(self, geometrie_per_nome: dict, salta_gia: bool,
+                                salva_ora: bool = True, aggiorna_ui: bool = True) -> tuple:
+        """Applica geometrie automatiche ai record (un'azione undo/redo per immagine).
+
+        Ritorna (applicate, saltate). Con aggiorna_ui=False non rinfresca filtri
+        e vista (usato nel batch: il refresh avviene una sola volta a fine run)."""
+        indice_di = {p.name: i for i, p in enumerate(self.immagini)}
+        applicate = 0
+        saltate = 0
+        toccate = False
+        for nome, geometrie in geometrie_per_nome.items():
+            record = self.progetto.immagini.get(nome)
+            if record is None:
+                saltate += len(geometrie)
+                continue
+            if salta_gia and record.geometrie:
+                saltate += len(geometrie)
+                continue
+            nuovo = record.copia()
+            nuovo.geometrie.extend(dict(g) for g in geometrie)
+            nuovo.da_verificare = True
+            nuovo.data_modifica = adesso_iso()
+            nuovo.etichettatore = self.progetto.config.etichettatore
+            indice = indice_di.get(nome, self.indice)
+            self.progetto.immagini[nome] = nuovo
+            self.storico.append(Azione(indice, record.copia(), nuovo.copia()))
+            self.storico_redo.clear()
+            applicate += len(geometrie)
+            toccate = True
+        if toccate:
+            self._imposta_non_salvato()
+            if salva_ora:
+                self.salva()
+            if aggiorna_ui:
+                self.aggiorna_filtri(mantieni_corrente=True)
+                self.mostra_indice(self.indice)
+        return applicate, saltate
+
+    def _importa_yolo(self) -> None:
+        cartella = QFileDialog.getExistingDirectory(self, "Cartella con i file .txt YOLO")
+        if not cartella:
+            return
+        try:
+            dati = da_yolo(Path(cartella), self._dimensioni_visibili())
+        except OSError as errore:
+            QMessageBox.critical(self, "Errore", f"Impossibile leggere la cartella:\n{errore}")
+            return
+        if not dati.geometrie and not dati.classi:
+            QMessageBox.information(self, "Import", "Nessuna annotazione trovata.")
+            return
+        self._applica_import(dati)
+
+    def _importa_coco(self) -> None:
+        percorso, _ = QFileDialog.getOpenFileName(
+            self, "File COCO json", str(self.cartella), "JSON (*.json);;Tutti i file (*)")
+        if not percorso:
+            return
+        try:
+            dati = da_coco(Path(percorso))
+        except (OSError, ValueError) as errore:
+            QMessageBox.critical(self, "Errore", f"File COCO non leggibile:\n{errore}")
+            return
+        self._applica_import(dati)
+
+    def _importa_labelme(self) -> None:
+        cartella = QFileDialog.getExistingDirectory(self, "Cartella con i file json LabelMe")
+        if not cartella:
+            return
+        try:
+            dati = da_labelme(Path(cartella))
+        except OSError as errore:
+            QMessageBox.critical(self, "Errore", f"Impossibile leggere la cartella:\n{errore}")
+            return
+        self._applica_import(dati)
+
+    def _importa_voc(self) -> None:
+        cartella = QFileDialog.getExistingDirectory(self, "Cartella con i file xml Pascal VOC")
+        if not cartella:
+            return
+        try:
+            dati = da_voc(Path(cartella))
+        except OSError as errore:
+            QMessageBox.critical(self, "Errore", f"Impossibile leggere la cartella:\n{errore}")
+            return
+        self._applica_import(dati)
+
+    def _applica_import(self, dati) -> None:
+        dialogo = DialogoMappatura(self.progetto.config, classi_fonte=dati.classi,
+                                   con_modello=False, parent=self)
+        if dialogo.exec() != DialogoMappatura.Accepted:
+            return
+        geometrie, scartate = filtra_e_abbina(
+            dati, [p.name for p in self.immagini], dialogo.mappa)
+        if not geometrie:
+            QMessageBox.information(
+                self, "Import", f"Nessuna annotazione applicabile ({scartate} scartate).")
+            return
+        applicate, saltate = self._applica_geometrie_auto(geometrie, salta_gia=dialogo.salta)
+        self.stato_label.setText(
+            f"Import: {applicate} geometrie applicate, {saltate} saltate, {scartate} scartate")
+
     def closeEvent(self, event) -> None:
+        if self._worker_annotazione is not None:
+            self._worker_annotazione.annulla()
+            self._worker_annotazione.wait()
         if not self.salvato:
             self.salva()
         event.accept()
