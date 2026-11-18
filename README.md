@@ -10,6 +10,8 @@ Desktop tool (PySide6 + OpenCV) to label, annotate and analyze any kind of image
 - **macOS**: `LabelAnything-<version>-macOS.zip` → extract and run `Label Anything.app`
 - **Linux**: `LabelAnything-<version>-linux64.zip` → extract and run `LabelAnything`
 
+Want in-app AI annotation (YOLO/Ultralytics models)? Grab the **`-ai` binaries** (e.g. `LabelAnything-<version>-win64-ai.zip`): same app, with `ultralytics` pre-bundled so model inference works out of the box (bundle size ~1-2 GB). The plain binaries stay lightweight — annotation import (YOLO txt/COCO/LabelMe/VOC) works everywhere.
+
 The binaries are built automatically for every release by GitHub Actions (PyInstaller, onedir: fast startup, no temporary unpacking). The `Source code` asset is there for developers.
 
 ### macOS: first launch (Gatekeeper)
@@ -123,7 +125,7 @@ Additional exports from the "Export" menu: COCO detection/segmentation, YOLO det
 
 Structure: `labeling_tool/` — `config.py` (schema and validation), `model.py` (records, project, undo/redo, calculations), `io_utils.py` (scanning and cache), `export.py` (formats, pure functions), `cursors.py` (annotation cursors), `image_view.py` (annotation viewer), `settings_dialog.py` (wizard and editor), `main_window.py` (main UI).
 
-Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`.
+Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux, in two variants — plain and `-ai` with `ultralytics` bundled (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`; AI variant: `INCLUDI_AI=1` with `requirements-build-ai.txt` installed.
 
 The optional **"Double-clickable macOS app"** section below is superseded by the release binaries, which already ship a real `Label Anything.app` bundle.
 

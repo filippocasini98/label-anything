@@ -1,6 +1,7 @@
 """Finestra principale dell'applicazione di etichettatura."""
 
 import os
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -482,7 +483,12 @@ class FinestraPrincipale(QMainWindow):
             menu.addAction("Annota tutte le immagini...", lambda: self._auto_annota("tutte"))
             menu.addSeparator()
         else:
-            voce = menu.addAction("Installa ultralytics per l'inferenza (pip install ultralytics)")
+            suggerimento = (
+                getattr(sys, "frozen", False)
+                and "Inferenza non inclusa: scarica la variante 'AI' dalla pagina release"
+                or "Installa ultralytics per l'inferenza (pip install ultralytics)"
+            )
+            voce = menu.addAction(suggerimento)
             voce.setEnabled(False)
             menu.addSeparator()
         sotto_menu = menu.addMenu("Importa annotazioni")
