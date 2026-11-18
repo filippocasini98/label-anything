@@ -15,6 +15,22 @@ if INCLUDI_AI:
     from PyInstaller.utils.hooks import collect_all
 
     ai_datas, ai_binaries, ai_hiddenimports = collect_all("ultralytics")
+
+    # alleggerimenti: dati torch di sviluppo (test/include e bin di test:
+    # torch/bin/torch_shm_manager serve a runtime) e .py gia' nel PYZ
+    def _da_scartare_ai(dest):
+        if dest.startswith(("torch/test", "torch/include")):
+            return True
+        if dest.startswith("torch/bin"):
+            return not dest.startswith("torch/bin/torch_shm_manager")
+        return False
+
+    ai_datas = [d for d in ai_datas if not _da_scartare_ai(d[0])]
+    ai_binaries = [b for b in ai_binaries if not _da_scartare_ai(b[0])]
+    ai_datas = [
+        d for d in ai_datas
+        if not (d[0].endswith(".py") and (d[0].startswith("torch/") or d[0].startswith("ultralytics/")))
+    ]
 else:
     ai_datas, ai_binaries, ai_hiddenimports = [], [], []
 
@@ -46,7 +62,7 @@ a = Analysis(
         "PySide6.QtNfc",
         "PySide6.QtPositioning",
         "PySide6.QtSensors",
-    ],
+    ] + (["polars"] if INCLUDI_AI else []),
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -68,6 +84,15 @@ if INCLUDI_AI:
     )
 a.binaries = [b for b in a.binaries if not any(x in b[0].lower() for x in _esclusioni_plugin)]
 a.datas = [d for d in a.datas if not any(x in d[0].lower() for x in _esclusioni_plugin)]
+
+if INCLUDI_AI:
+    # anche l'hook torch contribuisce a.datas/a.binaries: stessi scarti
+    a.binaries = [b for b in a.binaries if not _da_scartare_ai(b[0])]
+    a.datas = [d for d in a.datas if not _da_scartare_ai(d[0])]
+    a.datas = [
+        d for d in a.datas
+        if not (d[0].endswith(".py") and (d[0].startswith("torch/") or d[0].startswith("ultralytics/")))
+    ]
 
 # rimuove le copie di libreria duplicate a livello radice: se lo stesso file
 # esiste in una sottocartella (.libs/ rilocazioni dei wheel), i binari lo

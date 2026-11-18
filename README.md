@@ -10,7 +10,7 @@ Desktop tool (PySide6 + OpenCV) to label, annotate and analyze any kind of image
 - **macOS**: `LabelAnything-<version>-macOS.zip` → extract and run `Label Anything.app`
 - **Linux**: `LabelAnything-<version>-linux64.zip` → extract and run `LabelAnything`
 
-Want in-app AI annotation (YOLO/Ultralytics models)? Grab the **`-ai` binaries** (e.g. `LabelAnything-<version>-win64-ai.zip`): same app, with `ultralytics` pre-bundled so model inference works out of the box (bundle size ~1-2 GB). The plain binaries stay lightweight — annotation import (YOLO txt/COCO/LabelMe/VOC) works everywhere.
+Want in-app AI annotation (YOLO/Ultralytics models)? Grab the **`-ai` binaries** (e.g. `LabelAnything-<version>-win64-ai.zip`): same app, with `ultralytics` pre-bundled so model inference works out of the box (bundle size ~1 GB). The plain binaries stay lightweight — annotation import (YOLO txt/COCO/LabelMe/VOC) works everywhere.
 
 The binaries are built automatically for every release by GitHub Actions (PyInstaller, onedir: fast startup, no temporary unpacking). The `Source code` asset is there for developers.
 

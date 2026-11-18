@@ -36,7 +36,7 @@ jobs:
             echo "Novita' dalla versione ${precedente:-inizio}:"
             echo
             echo "- Self-contained binaries for Windows, macOS and Linux"
-            echo "- AI variants (-ai suffix): ultralytics pre-bundled, in-app YOLO inference ready (~1-2 GB)"
+            echo "- AI variants (-ai suffix): ultralytics pre-bundled, in-app YOLO inference ready (~1 GB)"
             echo
             git log --pretty=format:'- %s' "${precedente}..HEAD" 2>/dev/null || git log --pretty=format:'- %s' HEAD
           } > note.md
@@ -116,7 +116,7 @@ jobs:
       - name: Installa dipendenze di build
         run: |
           if [ "${{ matrix.variante }}" = "ai" ]; then
-            pip install torch --index-url https://download.pytorch.org/whl/cpu
+            pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           fi
           pip install -r ${{ matrix.requisiti }} pyinstaller
           if [ "${{ matrix.variante }}" = "ai" ]; then

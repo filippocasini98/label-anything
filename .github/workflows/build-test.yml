@@ -64,7 +64,7 @@ jobs:
 
       - name: Installa dipendenze di build (variante AI)
         run: |
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-build-ai.txt pyinstaller
           pip install --force-reinstall opencv-python-headless
 
