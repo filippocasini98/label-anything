@@ -53,6 +53,7 @@ class BoxItem(QGraphicsItem):
         self.on_modifica = on_modifica
         self.on_selezione = on_selezione
         self.selezionato = False
+        self.tratteggiato = False
         self.set_rect(rect)
         self.setAcceptHoverEvents(True)
         self._modalita = None
@@ -106,6 +107,8 @@ class BoxItem(QGraphicsItem):
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         pen = QPen(self.colore, 2)
+        if self.tratteggiato:
+            pen.setStyle(Qt.DashLine)
         if self.selezionato:
             pen.setWidth(3)
         painter.setPen(pen)
@@ -366,24 +369,35 @@ class ImageViewer(QGraphicsView):
                     QRectF(g["x"], g["y"], g["w"], g["h"]), colore, limite,
                     self._on_box_modificato, self._on_box_selezionato,
                 )
+                item.tratteggiato = record.da_verificare and g.get("origine") == "modello"
                 self.scene().addItem(item)
                 self._boxes.append(item)
                 if self._mostra_dimensioni:
+                    testo_box = self._testo_dimensioni_box(g["w"], g["h"])
+                    if item.tratteggiato and g.get("confidenza") is not None:
+                        testo_box += f"  {g['confidenza'] * 100:.0f}%"
                     self._testo_etichetta(
-                        self._testo_dimensioni_box(g["w"], g["h"]),
+                        testo_box,
                         QPointF(g["x"], max(0.0, g["y"] - 18)), colore,
                     )
             elif g.get("tipo") == "poligono":
                 item = QGraphicsPolygonItem(QPolygonF([QPointF(*p) for p in g["punti"]]))
                 qcolore = QColor(colore)
-                item.setPen(QPen(qcolore, 2))
+                penna = QPen(qcolore, 2)
+                if record.da_verificare and g.get("origine") == "modello":
+                    penna.setStyle(Qt.DashLine)
+                item.setPen(penna)
                 item.setBrush(QBrush(qcolore))
                 item.setOpacity(0.45)
                 self.scene().addItem(item)
                 self._altri_items.append(item)
                 if g["punti"] and self._mostra_dimensioni:
+                    testo_poligono = self._testo_dimensioni_poligono(g["punti"])
+                    if record.da_verificare and g.get("origine") == "modello":
+                        if g.get("confidenza") is not None:
+                            testo_poligono += f"  {g['confidenza'] * 100:.0f}%"
                     self._testo_etichetta(
-                        self._testo_dimensioni_poligono(g["punti"]),
+                        testo_poligono,
                         QPointF(g["punti"][0][0], max(0.0, g["punti"][0][1] - 18)),
                         colore,
                     )

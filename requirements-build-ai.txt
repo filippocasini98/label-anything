@@ -1,0 +1,10 @@
+# Build della variante "AI": inferenza in-app con ultralytics.
+#
+# Prima di questo file installare torch CPU per contenere la dimensione:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-build-ai.txt
+#
+# PyInstaller: INCLUDI_AI=1 pyinstaller --noconfirm label-anything.spec
+
+-r requirements-build.txt
+ultralytics

@@ -42,6 +42,7 @@ class Record:
     note: str = ""
     da_revisionare: bool = False
     revisionata: bool = False
+    da_verificare: bool = False
     data_modifica: str = ""
     etichettatore: str = ""
     geometrie: List[dict] = field(default_factory=list)
@@ -55,6 +56,7 @@ class Record:
             note=self.note,
             da_revisionare=self.da_revisionare,
             revisionata=self.revisionata,
+            da_verificare=self.da_verificare,
             data_modifica=self.data_modifica,
             etichettatore=self.etichettatore,
             geometrie=[dict(g) for g in self.geometrie],
@@ -68,6 +70,7 @@ class Record:
             "note": self.note,
             "da_revisionare": self.da_revisionare,
             "revisionata": self.revisionata,
+            "da_verificare": self.da_verificare,
             "data_modifica": self.data_modifica,
             "etichettatore": self.etichettatore,
             "geometrie": self.geometrie,
@@ -83,6 +86,7 @@ class Record:
             note=str(d.get("note", "")),
             da_revisionare=bool(d.get("da_revisionare", False)),
             revisionata=bool(d.get("revisionata", False)),
+            da_verificare=bool(d.get("da_verificare", False)),
             data_modifica=str(d.get("data_modifica", "")),
             etichettatore=str(d.get("etichettatore", "")),
             geometrie=list(d.get("geometrie", [])),

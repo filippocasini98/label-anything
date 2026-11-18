@@ -257,3 +257,23 @@ def test_esporta_html_immagine_mancante(tmp_path: Path):
     testo = dest.read_text(encoding="utf-8")
     assert "immagine non disponibile" in testo
     assert 'id="dati-json"' in testo
+
+
+def test_esporta_csv_da_verificare(tmp_path: Path):
+    p = progetto_esempio()
+    p.immagini["a.jpg"].da_verificare = True
+    dest = tmp_path / "e.csv"
+    esporta_csv(p, ["a.jpg", "b.jpg"], dest)
+    with dest.open(newline="", encoding="utf-8-sig") as f:
+        righe = list(csv.DictReader(f))
+    assert righe[0]["Da Verificare"] == "Si"
+    assert righe[1]["Da Verificare"] == "No"
+
+
+def test_report_statistiche_da_verificare(tmp_path: Path):
+    p = progetto_esempio()
+    p.immagini["a.jpg"].da_verificare = True
+    dest = tmp_path / "r.csv"
+    report_statistiche(p, ["a.jpg", "b.jpg"], dest)
+    testo = dest.read_text(encoding="utf-8-sig").replace("\r", "")
+    assert "da verificare (modello),1" in testo

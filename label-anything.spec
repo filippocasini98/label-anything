@@ -7,12 +7,23 @@ block_cipher = None
 
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
+# INCLUDI_AI=1 (con requirements-build-ai.txt installato) produce la variante
+# "AI" del bundle: ultralytics/torch inclusi, inferenza in-app disponibile.
+INCLUDI_AI = os.environ.get("INCLUDI_AI", "") == "1"
+
+if INCLUDI_AI:
+    from PyInstaller.utils.hooks import collect_all
+
+    ai_datas, ai_binaries, ai_hiddenimports = collect_all("ultralytics")
+else:
+    ai_datas, ai_binaries, ai_hiddenimports = [], [], []
+
 a = Analysis(
     ["run_labeling.py"],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=[],
+    binaries=ai_binaries,
+    datas=ai_datas,
+    hiddenimports=ai_hiddenimports,
     hookspath=[],
     runtime_hooks=[],
     excludes=[
@@ -49,6 +60,12 @@ _esclusioni_plugin = (
     "opengl32sw", "videoio_ffmpeg", "qpdf", "plugins/networkinformation", "plugins/tls",
     "libcrypto-3-x64", "libssl-3-x64",
 )
+if INCLUDI_AI:
+    # ultralytics scarica i pesi via HTTPS: servono le librerie TLS
+    _esclusioni_plugin = tuple(
+        x for x in _esclusioni_plugin
+        if x not in ("libcrypto-3-x64", "libssl-3-x64", "plugins/tls", "plugins/networkinformation")
+    )
 a.binaries = [b for b in a.binaries if not any(x in b[0].lower() for x in _esclusioni_plugin)]
 a.datas = [d for d in a.datas if not any(x in d[0].lower() for x in _esclusioni_plugin)]
 

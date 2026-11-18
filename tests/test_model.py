@@ -111,3 +111,23 @@ def test_dimensioni_bbox_poligono():
     punti = [[0.0, 0.0], [50.0, 10.0], [40.0, 60.0], [10.0, 30.0]]
     assert dimensioni_bbox_poligono(punti) == (50.0, 60.0)
     assert dimensioni_bbox_poligono([]) == (0.0, 0.0)
+
+
+def test_record_da_verificare_round_trip():
+    r = Record(nome="a.jpg", da_verificare=True)
+    assert Record.da_dict("a.jpg", r.in_dict()).da_verificare is True
+    assert r.copia().da_verificare is True
+    r2 = Record(nome="b.jpg")
+    assert r2.da_verificare is False
+    assert Record.da_dict("b.jpg", r2.in_dict()).da_verificare is False
+
+
+def test_geometrie_con_provenienza_sopravvivono():
+    g = {"tipo": "box", "classe": "esca", "x": 1.0, "y": 2.0, "w": 3.0, "h": 4.0,
+         "origine": "modello", "confidenza": 0.87, "modello": "yolo11n.pt"}
+    r = Record(nome="a.jpg", geometrie=[g])
+    r2 = Record.da_dict("a.jpg", r.in_dict())
+    assert r2.geometrie[0]["origine"] == "modello"
+    assert r2.geometrie[0]["confidenza"] == 0.87
+    assert r2.geometrie[0]["modello"] == "yolo11n.pt"
+    assert r.copia().geometrie[0]["confidenza"] == 0.87

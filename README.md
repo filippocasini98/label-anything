@@ -10,6 +10,8 @@ Desktop tool (PySide6 + OpenCV) to label, annotate and analyze any kind of image
 - **macOS**: `LabelAnything-<version>-macOS.zip` → extract and run `Label Anything.app`
 - **Linux**: `LabelAnything-<version>-linux64.zip` → extract and run `LabelAnything`
 
+Want in-app AI annotation (YOLO/Ultralytics models)? Grab the **`-ai` binaries** (e.g. `LabelAnything-<version>-win64-ai.zip`): same app, with `ultralytics` pre-bundled so model inference works out of the box (bundle size ~1-2 GB). The plain binaries stay lightweight — annotation import (YOLO txt/COCO/LabelMe/VOC) works everywhere.
+
 The binaries are built automatically for every release by GitHub Actions (PyInstaller, onedir: fast startup, no temporary unpacking). The `Source code` asset is there for developers.
 
 ### macOS: first launch (Gatekeeper)
@@ -81,6 +83,7 @@ with a `Contents/Info.plist` pointing `CFBundleExecutable` to `LabelAnything` (s
 - **Classification**: labels with configurable shortcut keys; single-label mode (auto-advance after assignment) or multi-label mode (toggle).
 - **Geometries** ("classification + geometries" or "geometries only" workflow): bounding boxes dragged on screen, resizable with 8 handles and movable; click-to-draw polygons, closed with Enter. Per-object class is selectable. The **size of every geometry** is shown on the image, reported in `etichette.csv` and aggregated per class in `statistiche.csv`: for boxes width/height/area, for polygons bounding box and area (mean, min, max, in px or in the configured unit).
 - **Measurements** (if enabled): distance between two clicks (px and configured unit via px/unit scale), polygon area, click object counting, **object dimensions** (dragged rectangle: width, height and area in px and in the configured unit — useful e.g. to measure stomata in electron microscope images). All measurements are saved and re-displayed.
+- **Auto-annotation**: annotate with YOLO/Ultralytics models (`.pt`/`.onnx`, detection → boxes, segmentation → polygons) run in-app — requires the optional `pip install ultralytics` package — or import ready-made annotations in YOLO txt, COCO json, LabelMe json or Pascal VOC xml format. Source classes are mapped onto the project labels in a dialog (confidence threshold, "skip images that already have geometries" option). Every model-annotated image stays **to verify**: fix it with the normal tools (move, resize, `Delete`, change class on the selected geometry) and approve with `V`, which jumps to the next image to verify; dedicated "To verify (model)" filter.
 - **Visual analysis**: brightness, contrast, grayscale, CLAHE equalization, zoom/pan.
 - **Statistics**: label distribution, progress, reviews, geometry and measurement counts; exportable to CSV.
 - **Filters**: by status (unlabeled, to review, reviewed, with notes, with geometries) and by label.
@@ -97,6 +100,7 @@ with a `Contents/Info.plist` pointing `CFBundleExecutable` to `LabelAnything` (s
 - `G` grayscale, `H` equalize, `R` reset view, `+`/`-` zoom
 - `Enter` closes polygon/area, `Esc` cancels drawing, `Delete` deletes the selected geometry/measurement (or the labels)
 - Polygon/area can also be closed by clicking the first vertex or double-clicking; the label combobox changes the class of the selected box
+- `V` approves the image (model annotations)
 
 ## Data and export
 
@@ -121,9 +125,11 @@ Additional exports from the "Export" menu: COCO detection/segmentation, YOLO det
 
 Structure: `labeling_tool/` — `config.py` (schema and validation), `model.py` (records, project, undo/redo, calculations), `io_utils.py` (scanning and cache), `export.py` (formats, pure functions), `cursors.py` (annotation cursors), `image_view.py` (annotation viewer), `settings_dialog.py` (wizard and editor), `main_window.py` (main UI).
 
-Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`.
+Every merge to `main` automatically produces a release (tag with bumped minor version) via GitHub Actions (`.github/workflows/release.yml`): `Source-code.zip` plus self-contained binaries for Windows, macOS and Linux, in two variants — plain and `-ai` with `ultralytics` bundled (built with PyInstaller from `label-anything.spec`, see `docs/piano-distribuzione-self-contained.md`). Local binary build: `APP_VERSION=vX.Y.Z ./scripts/build.sh`; AI variant: `INCLUDI_AI=1` with `requirements-build-ai.txt` installed.
 
 The optional **"Double-clickable macOS app"** section below is superseded by the release binaries, which already ship a real `Label Anything.app` bundle.
+
+In-app inference requires the optional package: `./venv/bin/pip install ultralytics`. Without it, annotation import (YOLO/COCO/LabelMe/VOC) and everything else remain available.
 
 ## Sharing the program
 

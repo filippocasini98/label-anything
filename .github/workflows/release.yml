@@ -36,6 +36,7 @@ jobs:
             echo "Novita' dalla versione ${precedente:-inizio}:"
             echo
             echo "- Self-contained binaries for Windows, macOS and Linux"
+            echo "- AI variants (-ai suffix): ultralytics pre-bundled, in-app YOLO inference ready (~1-2 GB)"
             echo
             git log --pretty=format:'- %s' "${precedente}..HEAD" 2>/dev/null || git log --pretty=format:'- %s' HEAD
           } > note.md
@@ -80,10 +81,28 @@ jobs:
         include:
           - os: windows-latest
             suffisso: win64
+            variante: base
+            requisiti: requirements-build.txt
+          - os: windows-latest
+            suffisso: win64
+            variante: ai
+            requisiti: requirements-build-ai.txt
           - os: macos-latest
             suffisso: macOS
+            variante: base
+            requisiti: requirements-build.txt
+          - os: macos-latest
+            suffisso: macOS
+            variante: ai
+            requisiti: requirements-build-ai.txt
           - os: ubuntu-latest
             suffisso: linux64
+            variante: base
+            requisiti: requirements-build.txt
+          - os: ubuntu-latest
+            suffisso: linux64
+            variante: ai
+            requisiti: requirements-build-ai.txt
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -95,12 +114,21 @@ jobs:
           cache-dependency-path: requirements-build.txt
 
       - name: Installa dipendenze di build
-        run: pip install -r requirements-build.txt pyinstaller
+        run: |
+          if [ "${{ matrix.variante }}" = "ai" ]; then
+            pip install torch --index-url https://download.pytorch.org/whl/cpu
+          fi
+          pip install -r ${{ matrix.requisiti }} pyinstaller
+          if [ "${{ matrix.variante }}" = "ai" ]; then
+            # ultralytics tira dentro opencv-python completo: la headless resta
+            pip install --force-reinstall opencv-python-headless
+          fi
 
       - name: Build con PyInstaller
         run: pyinstaller --noconfirm label-anything.spec
         env:
           APP_VERSION: ${{ needs.release.outputs.versione }}
+          INCLUDI_AI: ${{ matrix.variante == 'ai' && '1' || '' }}
 
       - name: Assembla Label Anything.app (macOS)
         if: runner.os == 'macOS'
@@ -170,7 +198,7 @@ jobs:
       - name: Pacchetto (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          zip="LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip"
+          zip="LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}${{ matrix.variante == 'ai' && '-ai' || '' }}.zip"
           if [ "${{ runner.os }}" = "macOS" ]; then
             cd dist && zip -r -y "../$zip" "Label Anything.app"
           else
@@ -180,10 +208,10 @@ jobs:
       - name: Pacchetto (Windows)
         if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path dist/LabelAnything -DestinationPath "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip"
+          Compress-Archive -Path dist/LabelAnything -DestinationPath "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}${{ matrix.variante == 'ai' && '-ai' || '' }}.zip"
 
       - name: Allega alla release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: gh release upload "${{ needs.release.outputs.versione }}" "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}.zip" --clobber
+        run: gh release upload "${{ needs.release.outputs.versione }}" "LabelAnything-${{ needs.release.outputs.versione }}-${{ matrix.suffisso }}${{ matrix.variante == 'ai' && '-ai' || '' }}.zip" --clobber
